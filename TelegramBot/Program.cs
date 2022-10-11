@@ -3,6 +3,7 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using System.Text.Json;
 using Telegram.Bot.Extensions.Polling;
+using System;
 
 namespace TelegramBot
 {
@@ -16,27 +17,52 @@ namespace TelegramBot
             if (update.Type == Telegram.Bot.Types.Enums.UpdateType.Message)
             {
                 var message = update.Message;
-                Console.WriteLine("Сообщение юзера: " + message.Text);
-                if (message.Text == "/start")
+                var chat = message.Chat;
+                var text = message.Text;
+                Console.WriteLine("Сообщение юзера: " + text);
+                if (text.Contains("edit"))
                 {
-                    await bot.SendTextMessageAsync(message.Chat, "Добро пожаловать!");
+                    var lineToDelete = string.Join(' ', text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1));
+                    messageProcess.DeleteLine(lineToDelete);
+                    await bot.SendTextMessageAsync(chat, "Успешно удалено!");
+                    await PrepareAnswer(bot, chat);
                     return;
                 }
-                messageProcess.StartProcess(message.Text);
-                var answer = messageProcess.GetFullMessage();
-                var length = answer.Length;
-                Console.WriteLine(length);
-                if (length > 0 /*&& length < 3000*/)
-                    await bot.SendTextMessageAsync(message.Chat, answer);
-                //else if (length > 3000)
-                //{
-                //    for (float i = 0f; i < length / 3000f; i++)
-                //    {
-                //        var text = answer.Substring(i, i)
-                //    }
-                //}
+                messageProcess.StartProcess(text);
+                await PrepareAnswer(bot, chat);
+            }
+        }
+        public static async Task PrepareAnswer(ITelegramBotClient bot, Chat chat)
+        {
+            var answer = messageProcess.GetFullMessage();
+            var length = answer.Length;
+            Console.WriteLine(length);
+            await SendAnswer(bot, answer, length, chat);
+        }
+        public static async Task SendAnswer(ITelegramBotClient bot, string answer, int length, Chat chat)
+        {
+            try
+            {
+                if (length > 0 && length < 3000)
+                    await bot.SendTextMessageAsync(chat, answer);
+                else if (length > 3000)
+                {
+                    for (int i = 0; i < length; i += 3000)
+                    {
+                        var text = answer.Substring(i, Math.Min(3000, length - i));
+                        Console.WriteLine(text);
+                        if (string.IsNullOrEmpty(text)) //
+                            Console.WriteLine("ПУСТО");
+                        else
+                            await bot.SendTextMessageAsync(chat, text);
+                    }
+                }
                 else
-                    await bot.SendTextMessageAsync(message.Chat, "Произошла ошибка, ответа нет.");
+                    await bot.SendTextMessageAsync(chat, "Произошла ошибка, ответа нет.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
             }
         }
         public static async Task HandleErrorsAsync(ITelegramBotClient bot, Exception ex, CancellationToken cancellationToken)

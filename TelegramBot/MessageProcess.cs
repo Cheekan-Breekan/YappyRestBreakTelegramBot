@@ -60,7 +60,6 @@ namespace TelegramBot
                 }
             }
         }
-
         private void DeleteOldDates()
         {
             foreach (var line in MessageLines.ToList())
@@ -80,7 +79,14 @@ namespace TelegramBot
             Console.WriteLine(MessageLines.Count);
             return fullMessage;
         }
-
+        public void DeleteLine(string needToDelete)
+        {
+            foreach (var line in MessageLines.ToList())
+            {
+                if (line.ToString() == needToDelete)
+                    MessageLines.Remove(line);
+            }
+        }
         private DateTime ConvertToDate(string time)
         {
             var date = DateTime.ParseExact(time, "H:m", CultureInfo.CurrentCulture);
