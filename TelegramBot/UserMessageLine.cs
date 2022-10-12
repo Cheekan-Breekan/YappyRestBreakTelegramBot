@@ -17,7 +17,7 @@ namespace TelegramBot
         }
         public override string ToString()
         {
-            return $"{DinnerDate.ToString("HH:mm")} {Info}";
+            return $"{DinnerDate:HH:mm} {Info}";
         }
     }
 }

@@ -10,11 +10,12 @@ namespace TelegramBot
 {
     public class MessageProcess
     {
-        public string Message { get; set; }
-        //public string LastMessage { get; set; }
-        public List<UserMessageLine> MessageLines { get; set; } = new();
+        public string Message { get; private set; }
+        public List<UserMessageLine> MessageLines { get; private set; } = new();
+        public bool IsErrorDetected { get; private set; }
         public void StartProcess(string messageText)
         {
+            IsErrorDetected = false;
             Message = messageText.Trim();
             try
             {
@@ -31,6 +32,7 @@ namespace TelegramBot
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
+                IsErrorDetected = true;
             }
         }
         private void InsertInList(DateTime date, string info)
@@ -68,9 +70,13 @@ namespace TelegramBot
                     MessageLines.Remove(line);
             }
         }
-
         public string GetFullMessage()
         {
+            if (IsErrorDetected)
+            {
+                IsErrorDetected = false;
+                return "Неправильный ввод данных. Список перерывов не изменён! Используйте команду help для помощи.";
+            }
             string fullMessage = String.Empty;
             foreach (var line in MessageLines)
             {
@@ -81,11 +87,21 @@ namespace TelegramBot
         }
         public void DeleteLine(string needToDelete)
         {
+            var counter = 0;
             foreach (var line in MessageLines.ToList())
             {
                 if (line.ToString() == needToDelete)
+                {
                     MessageLines.Remove(line);
+                    counter++;
+                }
             }
+            if (counter == 0)
+                IsErrorDetected = true;
+        }
+        public void ClearList()
+        {
+            MessageLines.Clear();
         }
         private DateTime ConvertToDate(string time)
         {
