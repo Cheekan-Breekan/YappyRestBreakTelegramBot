@@ -8,16 +8,18 @@ namespace TelegramBot
 {
     public class UserMessageLine
     {
-        public DateTime DinnerDate { get; set; }
-        public string Info { get; set; }
-        public UserMessageLine(DateTime dinnerDate, string info)
+        public DateTime DinnerDate { get; }
+        public string Name { get; }
+        public int Minutes { get; }
+        public UserMessageLine(DateTime dinnerDate, string info, int minutes)
         {
             DinnerDate = dinnerDate;
-            Info = info;
+            Name = info;
+            Minutes = minutes;
         }
         public override string ToString()
         {
-            return $"{DinnerDate:HH:mm} {Info}";
+            return $"{DinnerDate:HH:mm} {Name} {Minutes}";
         }
     }
 }
