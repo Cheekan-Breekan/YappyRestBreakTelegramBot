@@ -12,6 +12,7 @@ namespace TelegramBot
     internal class Program
     {
         const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI";
+        //const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc";
         static ITelegramBotClient telegramBot = new TelegramBotClient(token);
         static MessageProcess messageProcess = new MessageProcess();
         public static async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cancellationToken)
@@ -33,17 +34,19 @@ namespace TelegramBot
                 if (text.ToLower().Contains("help"))
                 {
                     var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}Днем - максимум 14 (только 7 обедов и 7 десятиминуток).{Environment.NewLine}" +
-                        $"Ночью - максимум 6 (только 3 обеда и 3 десятиминутки).";
-                    await bot.SendTextMessageAsync(chat, $"Правила отправки сообщений.{Environment.NewLine}Заполните по следующему образцу:{Environment.NewLine}" +
+                        $"Ночью - максимум 10 (только 5 обедов и 5 десятиминуток).";
+                    await bot.SendTextMessageAsync(chat, $"Правила отправки сообщений!{Environment.NewLine}Заполните по следующему образцу:{Environment.NewLine}" +
                         $"Время перерыва (пробел) Фамилия/Имя (пробел) Количество минут перерыва.{Environment.NewLine}" +
                         $"Например:{Environment.NewLine}{Environment.NewLine}18:30 Цаль Виталий 10{Environment.NewLine}{Environment.NewLine}" +
                         $"Если нужно поставить больше одного перерыва в одном сообщении, то просто пишите каждый новый перерыв в новую строку." +
-                        $"{Environment.NewLine}Например:{Environment.NewLine}{Environment.NewLine}17:00 Должанский Николай 30{Environment.NewLine}20:30 Должанский Николай 10" +
+                        $"{Environment.NewLine}Например:{Environment.NewLine}{Environment.NewLine}17:00 Цаль Виталий 30{Environment.NewLine}20:30 Цаль Виталий 10" +
                         $"{Environment.NewLine}{Environment.NewLine}" +
-                        $"Обеды можно проставлять только в :00 и в :30 минут. Десятиминутки в :00 или :10 минут." +
-                        $"Если нужно удалить свой перерыв, то используйте ключевое слово delete. Например:{Environment.NewLine}{Environment.NewLine}" +
-                        $"delete 13:00 Роман Мальцев 30{Environment.NewLine}{Environment.NewLine}" +
-                        $"Фраза выше, отправленная в чат, удалит перерыв Романа Мальцева на 13:00 из списка. При удалении фраза должна совпадать 1 в 1 с фразой в списке, " +
+                        $"Не нужно редактировать уже посланные сообщения, бот их не примет.{Environment.NewLine}" +
+                        $"Обеды можно проставлять только в :00 и в :30 минут. Десятиминутки в минуты, кратные 10.{Environment.NewLine}" +
+                        $"Сообщение с ключевым словом <<список>> позволяет просмотреть текущий список перерывов, не изменяя его.{Environment.NewLine}" +
+                        $"Если нужно удалить свой перерыв, то используйте ключевое слово <<delete>>. Например:{Environment.NewLine}{Environment.NewLine}" +
+                        $"delete 17:00 Цаль Виталий 30{Environment.NewLine}{Environment.NewLine}" +
+                        $"Фраза выше, отправленная в чат, удалит перерыв Цаля Виталия на 17:00 из списка. При удалении фраза должна совпадать 1 в 1 с фразой в списке, " +
                         $"лучше используйте ctrl+c. Удаляется лишь один перерыв за раз, мультистрочность не поддерживается." +
                         $"{Environment.NewLine}{Environment.NewLine}{rules}", replyToMessageId:id); /*+*/
                         //$"{Environment.NewLine}{Environment.NewLine}Также другие ключевые слова:{Environment.NewLine}" +
@@ -53,10 +56,15 @@ namespace TelegramBot
                     return;
                 }
                 if (text.ToLower().Contains("оффтоп")) { return; }
-                if (text == "reset")
+                if (text.ToLower() == "reset")
                 {
                     messageProcess.ClearList();
                     await bot.SendTextMessageAsync(chat, "Список перерывов полностью очищен!", replyToMessageId:id);
+                    return;
+                }
+                if (text.ToLower() == "список")
+                {
+                    await PrepareAnswer(bot, chat, id);
                     return;
                 }
                 messageProcess.StartProcess(text);
@@ -89,7 +97,7 @@ namespace TelegramBot
                     }
                 }
                 else
-                    await bot.SendTextMessageAsync(chat, "Произошла непредвиденная ошибка при отправке ответного сообщения!", replyToMessageId: id);
+                    await bot.SendTextMessageAsync(chat, "Произошла непредвиденная ошибка при отправке ответного сообщения! Пожалуйста, сообщите о ней.", replyToMessageId: id);
             }
             catch (Exception ex)
             {

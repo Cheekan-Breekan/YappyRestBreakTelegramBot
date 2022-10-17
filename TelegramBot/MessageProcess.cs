@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -19,55 +20,91 @@ namespace TelegramBot
         public string ErrorMessage { get; private set; }
         public void StartProcess(string messageText)
         {
+            ErrorMessage = String.Empty;
             IsErrorDetected = false;
             Message = messageText.Trim();
+            //bool tempLengthCheck = Message.Contains("insert") ? true : false;
+            var tempLengthCheck = false;
+            var firstLine = false;
+            if (Message.Contains("insert"))
+            {
+                tempLengthCheck = true;
+                firstLine = true;
+            }
             try
             {
+                DateTime date = new DateTime();
+                int time = 0;
+                string name = string.Empty;
                 foreach (var line in Message.Split($"\n"))
                 {
-                    if (string.IsNullOrWhiteSpace(line))
+                    if (string.IsNullOrWhiteSpace(line) || (tempLengthCheck && firstLine))
+                    {
+                        firstLine = false;
                         continue;
+                    }    
                     var splittedLine = line.Trim().Split(' ');
-                    var date = ConvertToDate(splittedLine[0]);
-                    var time = int.Parse(splittedLine.Last());
-                    var name = line.Replace(splittedLine.First(), "").Replace(splittedLine.Last(), "").Trim();
-                    if (CheckForRightDinnerTime(date.Minute, time) && CheckForFreeSlots(date, time))
+                    try
+                    {
+                        date = ConvertToDate(splittedLine[0]);
+                        time = int.Parse(splittedLine.Last());
+                        name = line.Replace(splittedLine.First(), "").Replace(splittedLine.Last(), "").Trim();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex);
+                        IsErrorDetected = true;
+                        ErrorMessage += $"Грамматически неправильный перерыв в {date:H:mm}! Измените этот конкретный перерыв и отправьте его заново. " +
+                            $"Правильные перерывы записаны!{Environment.NewLine}{Environment.NewLine}";
+                        continue;
+                    }
+                    if (Message.Split($"\n").Count() > 7 && !tempLengthCheck)
+                    {
+                        IsErrorDetected = true;
+                        ErrorMessage = "Неправильный ввод данных. Список перерывов не изменён! Вы вносите слишком много перерывов, добавляйте лишь свои!";
+                        return;
+                    }
+                    if (CheckForRightDinnerTime(date, time) && CheckForFreeSlots(date, time))
+                    {
                         InsertInList(date, name, time);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
                 IsErrorDetected = true;
-                ErrorMessage = "Неправильный ввод данных. Список перерывов не изменён! Используйте команду help для помощи.";
+                ErrorMessage = "Неправильный ввод данных. Список перерывов не изменён!";
             }
         }
 
-        private bool CheckForRightDinnerTime(int dateMinutes, int time)
+        private bool CheckForRightDinnerTime(DateTime date, int time)
         {
+            int dateMinutes = date.Minute;
             if (time == TenMinutes && (dateMinutes % TenMinutes == 0))
                 return true;
             if (time == ThirtyMinutes && (ZeroMinutes == dateMinutes || ThirtyMinutes == dateMinutes))
                 return true;
             IsErrorDetected = true;
-            ErrorMessage = $"Неправильно проставлено время перерыва!{Environment.NewLine}Перерывы могут быть либо 10 минут, либо 30. Обеды допустимы только в :00 минут и в :30 минут," +
-                $" а десятиминутки в любую минуту, оканчивающуюся на 0.{Environment.NewLine}Используйте команду help для помощи.";
+            ErrorMessage += $"Неправильный перерыв в {date:H:mm}! Измените этот конкретный перерыв и отправьте его заново. Правильные перерывы записаны!{Environment.NewLine}Перерывы могут быть либо 10 минут, либо 30. Обеды допустимы только в :00 минут и в :30 минут," +
+                $" а десятиминутки в любую минуту, оканчивающуюся на 0.{Environment.NewLine}{Environment.NewLine}";
             return false;
         }
         private bool CheckForFreeSlots(DateTime date, int time)
         {
             var counter = 0;
-            var limit = (DateTime.Now.Hour <= 22 && DateTime.Now.Hour >= 6) ? 7 : 3;
+            //var limit = (DateTime.Now.Hour <= 22 && DateTime.Now.Hour >= 6) ? 7 : 3;
+            var limit = (date.Hour < 22 && date.Hour >= 6) ? 7 : 5;
             foreach (var line in MessageLines)
             {
                 if (line.DinnerDate == date && line.Minutes == time)
                     counter++;
             }
-            if (counter >= 7)
+            if (counter >= limit)
             {
                 var tenOrThirty = time == 10 ? "десятиминутных перерыва(-ов)" : "обеда(-ов)";
                 IsErrorDetected = true;
-                ErrorMessage = $"В {date:h:m} уже {limit} {tenOrThirty}. Выберите другое время. Используйте команду help для помощи.";
+                ErrorMessage += $"В {date:H:mm} уже {limit} {tenOrThirty}. Выберите для этого конкретного перерыва другое время и отправьте его заново. Правильные перерывы записаны!{Environment.NewLine}{Environment.NewLine}";
                 return false;
             }
             return true;
@@ -113,17 +150,17 @@ namespace TelegramBot
             if (IsErrorDetected)
             {
                 IsErrorDetected = false;
-                return ErrorMessage;
+                return ErrorMessage += " Используйте команду help для помощи.";
             }
             string fullMessage = String.Empty;
             foreach (var line in MessageLines)
             {
                 fullMessage += line + Environment.NewLine;
             }
-            Console.WriteLine(MessageLines.Count);
+            //Console.WriteLine(MessageLines.Count);
             return fullMessage;
         }
-        public void DeleteLine(string needToDelete)
+        public void DeleteLine(string needToDelete, bool IsWorkaround = false)
         {
             var counter = 0;
             foreach (var line in MessageLines.ToList())
@@ -136,7 +173,8 @@ namespace TelegramBot
             }
             if (counter == 0)
             {
-                ErrorMessage = "Нет совпадения в списке с введенным перерывом для удаления! Используйте команду help для помощи.";
+                if (!IsWorkaround)
+                    ErrorMessage = "Нет совпадения в списке с введенным перерывом для удаления!";
                 IsErrorDetected = true;
             }
             DeleteOldDates();
