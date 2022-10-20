@@ -15,6 +15,8 @@ namespace TelegramBot
         //const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc";
         static ITelegramBotClient telegramBot = new TelegramBotClient(token);
         static MessageProcess messageProcess = new MessageProcess();
+        static Logger logger = new Logger();
+
         public static async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cancellationToken)
         {
             if (update.Type == UpdateType.Message && update?.Message?.Text != null)
@@ -23,31 +25,40 @@ namespace TelegramBot
                 var chat = message.Chat;
                 var text = message.Text;
                 var id = message.MessageId;
-                Console.WriteLine("Сообщение юзера: " + text);
+                Console.WriteLine($"Сообщение от {message.From}: " + text);
+                try
+                {
+                    logger.LogMessage(text, message.From.ToString());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                }
                 if (text.ToLower().Contains("delete"))
                 {
-                    var lineToDelete = string.Join(' ', text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1));
+                    var lineToDelete = string.Join(' ', text.Split(' ').Skip(1));
                     messageProcess.DeleteLine(lineToDelete);
                     await PrepareAnswer(bot, chat, id);
                     return;
                 }
                 if (text.ToLower().Contains("help"))
                 {
-                    var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}Днем - максимум 14 (только 7 обедов и 7 десятиминуток).{Environment.NewLine}" +
-                        $"Ночью - максимум 10 (только 5 обедов и 5 десятиминуток).";
+                    var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}Днем - только 10 обедов и 7 десятиминуток.{Environment.NewLine}" +
+                        $"Ночью - только 5 обедов и 5 десятиминуток.";
                     await bot.SendTextMessageAsync(chat, $"Правила отправки сообщений!{Environment.NewLine}Заполните по следующему образцу:{Environment.NewLine}" +
                         $"Время перерыва (пробел) Фамилия/Имя (пробел) Количество минут перерыва.{Environment.NewLine}" +
                         $"Например:{Environment.NewLine}{Environment.NewLine}18:30 Цаль Виталий 10{Environment.NewLine}{Environment.NewLine}" +
-                        $"Если нужно поставить больше одного перерыва в одном сообщении, то просто пишите каждый новый перерыв в новую строку." +
+                        $"Если нужно поставить больше одного перерыва в одном сообщении, то просто пишите каждый новый перерыв в новую строку (именно новая строка, а не сотня пробелов😉)." +
                         $"{Environment.NewLine}Например:{Environment.NewLine}{Environment.NewLine}17:00 Цаль Виталий 30{Environment.NewLine}20:30 Цаль Виталий 10" +
                         $"{Environment.NewLine}{Environment.NewLine}" +
-                        $"Не нужно редактировать уже посланные сообщения, бот их не примет.{Environment.NewLine}" +
+                        $"{Environment.NewLine}Запрещены цифры в имени/фамилии, а также пустые строки или длиной больше 50 символов. " +
+                        $"Не нужно редактировать уже посланные сообщения, бот их не примет😢.{Environment.NewLine}" +
                         $"Обеды можно проставлять только в :00 и в :30 минут. Десятиминутки в минуты, кратные 10.{Environment.NewLine}" +
                         $"Сообщение с ключевым словом <<список>> позволяет просмотреть текущий список перерывов, не изменяя его.{Environment.NewLine}" +
                         $"Если нужно удалить свой перерыв, то используйте ключевое слово <<delete>>. Например:{Environment.NewLine}{Environment.NewLine}" +
                         $"delete 17:00 Цаль Виталий 30{Environment.NewLine}{Environment.NewLine}" +
                         $"Фраза выше, отправленная в чат, удалит перерыв Цаля Виталия на 17:00 из списка. При удалении фраза должна совпадать 1 в 1 с фразой в списке, " +
-                        $"лучше используйте ctrl+c. Удаляется лишь один перерыв за раз, мультистрочность не поддерживается." +
+                        $"лучше используйте ctrl+c. Удаляется лишь один перерыв за раз, мультистрочность пока не поддерживается." +
                         $"{Environment.NewLine}{Environment.NewLine}{rules}", replyToMessageId:id); /*+*/
                         //$"{Environment.NewLine}{Environment.NewLine}Также другие ключевые слова:{Environment.NewLine}" +
                         //$"help - вызов данного сообщения,{Environment.NewLine}" +
