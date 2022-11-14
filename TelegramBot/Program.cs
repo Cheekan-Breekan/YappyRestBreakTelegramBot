@@ -12,7 +12,7 @@ namespace TelegramBot
     internal class Program
     {
         const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI";
-        //const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc";
+        //const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
         static ITelegramBotClient telegramBot = new TelegramBotClient(token);
         static MessageProcess messageProcess = new MessageProcess();
         static Logger logger = new Logger();
@@ -34,52 +34,55 @@ namespace TelegramBot
                 {
                     Console.WriteLine(ex);
                 }
-                if (text.ToLower().Contains("delete"))
+                switch (text.ToLower())
                 {
-                    var lineToDelete = string.Join(' ', text.Split(' ').Skip(1));
-                    messageProcess.DeleteLine(lineToDelete);
-                    await PrepareAnswer(bot, chat, id);
-                    return;
+                    case string a when a.Contains("оффтоп"): { break; }
+                    case string a when a.Contains("delete"):
+                        {
+                            messageProcess.DeleteLines(text);
+                            await PrepareAnswer(bot, chat, id);
+                            break;
+                        }
+                    case string b when b.Contains("help"):
+                        {
+                            var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}Днем с 12 до 16 - 15 обедов и 7 десятиминуток," +
+                            $"в остальное дневное время 10 обедов и 7 десятиминуток.{Environment.NewLine}" +
+                            $"Ночью - только 5 обедов и 5 десятиминуток.";
+                            await bot.SendTextMessageAsync(chat, $"Правила отправки сообщений!{Environment.NewLine}Заполните по следующему образцу:{Environment.NewLine}" +
+                            $"Время перерыва (пробел) Фамилия/Имя (пробел) Количество минут перерыва.{Environment.NewLine}" +
+                            $"Например:{Environment.NewLine}{Environment.NewLine}18:30 Цаль Виталий 10{Environment.NewLine}{Environment.NewLine}" +
+                            $"Если нужно поставить больше одного перерыва в одном сообщении, то просто пишите каждый новый перерыв в новую строку (именно новая строка, а не сотня пробелов😉)." +
+                            $"{Environment.NewLine}Например:{Environment.NewLine}{Environment.NewLine}17:00 Цаль Виталий 30{Environment.NewLine}20:30 Цаль Виталий 10" +
+                            $"{Environment.NewLine}{Environment.NewLine}" +
+                            $"{Environment.NewLine}Запрещены цифры в имени/фамилии, а также пустые строки или длиной больше 50 символов. " +
+                            $"Не нужно редактировать уже посланные сообщения, бот их не примет😢.{Environment.NewLine}" +
+                            $"Обеды можно проставлять только в :00 и в :30 минут. Десятиминутки в минуты, кратные 10.{Environment.NewLine}" +
+                            $"Сообщение с ключевым словом <<список>> позволяет просмотреть текущий список перерывов, не изменяя его.{Environment.NewLine}" +
+                            $"Если нужно удалить свой перерыв, то используйте ключевое слово <<delete>>. Например:{Environment.NewLine}{Environment.NewLine}" +
+                            $"delete 17:00 Цаль Виталий 30{Environment.NewLine}{Environment.NewLine}" +
+                            $"Фраза выше, отправленная в чат, удалит перерыв Цаля Виталия на 17:00 из списка. При удалении фраза должна совпадать 1 в 1 с фразой в списке, " +
+                            $"лучше используйте ctrl+c." +
+                            $"{Environment.NewLine}{Environment.NewLine}{rules}", replyToMessageId: id);
+                            break;
+                        }
+                    case string d when d.Contains("reset"):
+                        {
+                            messageProcess.ClearList();
+                            await bot.SendTextMessageAsync(chat, "Список перерывов полностью очищен!", replyToMessageId: id);
+                            break;
+                        }
+                    case string e when e.Contains("список"):
+                        {
+                            await PrepareAnswer(bot, chat, id);
+                            break;
+                        }
+                    default:
+                        {
+                            messageProcess.StartProcess(text);
+                            await PrepareAnswer(bot, chat, id);
+                            break;
+                        }
                 }
-                if (text.ToLower().Contains("help"))
-                {
-                    var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}Днем - только 10 обедов и 7 десятиминуток.{Environment.NewLine}" +
-                        $"Ночью - только 5 обедов и 5 десятиминуток.";
-                    await bot.SendTextMessageAsync(chat, $"Правила отправки сообщений!{Environment.NewLine}Заполните по следующему образцу:{Environment.NewLine}" +
-                        $"Время перерыва (пробел) Фамилия/Имя (пробел) Количество минут перерыва.{Environment.NewLine}" +
-                        $"Например:{Environment.NewLine}{Environment.NewLine}18:30 Цаль Виталий 10{Environment.NewLine}{Environment.NewLine}" +
-                        $"Если нужно поставить больше одного перерыва в одном сообщении, то просто пишите каждый новый перерыв в новую строку (именно новая строка, а не сотня пробелов😉)." +
-                        $"{Environment.NewLine}Например:{Environment.NewLine}{Environment.NewLine}17:00 Цаль Виталий 30{Environment.NewLine}20:30 Цаль Виталий 10" +
-                        $"{Environment.NewLine}{Environment.NewLine}" +
-                        $"{Environment.NewLine}Запрещены цифры в имени/фамилии, а также пустые строки или длиной больше 50 символов. " +
-                        $"Не нужно редактировать уже посланные сообщения, бот их не примет😢.{Environment.NewLine}" +
-                        $"Обеды можно проставлять только в :00 и в :30 минут. Десятиминутки в минуты, кратные 10.{Environment.NewLine}" +
-                        $"Сообщение с ключевым словом <<список>> позволяет просмотреть текущий список перерывов, не изменяя его.{Environment.NewLine}" +
-                        $"Если нужно удалить свой перерыв, то используйте ключевое слово <<delete>>. Например:{Environment.NewLine}{Environment.NewLine}" +
-                        $"delete 17:00 Цаль Виталий 30{Environment.NewLine}{Environment.NewLine}" +
-                        $"Фраза выше, отправленная в чат, удалит перерыв Цаля Виталия на 17:00 из списка. При удалении фраза должна совпадать 1 в 1 с фразой в списке, " +
-                        $"лучше используйте ctrl+c. Удаляется лишь один перерыв за раз, мультистрочность пока не поддерживается." +
-                        $"{Environment.NewLine}{Environment.NewLine}{rules}", replyToMessageId:id); /*+*/
-                        //$"{Environment.NewLine}{Environment.NewLine}Также другие ключевые слова:{Environment.NewLine}" +
-                        //$"help - вызов данного сообщения,{Environment.NewLine}" +
-                        //$"оффтоп - при наличии данного слова в вашем сообщении бот не будет реагировать на него,{Environment.NewLine}" +
-                        //$"reset - полное удаление списка с перерывами из памяти бота, использовать только при необходимости!");
-                    return;
-                }
-                if (text.ToLower().Contains("оффтоп")) { return; }
-                if (text.ToLower() == "reset")
-                {
-                    messageProcess.ClearList();
-                    await bot.SendTextMessageAsync(chat, "Список перерывов полностью очищен!", replyToMessageId:id);
-                    return;
-                }
-                if (text.ToLower() == "список")
-                {
-                    await PrepareAnswer(bot, chat, id);
-                    return;
-                }
-                messageProcess.StartProcess(text);
-                await PrepareAnswer(bot, chat, id);
             }
         }
         public static async Task PrepareAnswer(ITelegramBotClient bot, Chat chat, int id)
@@ -94,7 +97,7 @@ namespace TelegramBot
             try
             {
                 if (length > 0 && length < 3000)
-                    await bot.SendTextMessageAsync(chat, answer, replyToMessageId:id);
+                    await bot.SendTextMessageAsync(chat, answer, replyToMessageId: id);
                 else if (length > 3000)
                 {
                     for (int i = 0; i < length; i += 3000)

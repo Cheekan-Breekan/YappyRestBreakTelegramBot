@@ -16,7 +16,6 @@ namespace TelegramBot
         {
             CreateNewLogFile();
         }
-
         private void CreateNewLogFile()
         {
             Date = DateTime.Now;
@@ -24,11 +23,10 @@ namespace TelegramBot
                 Directory.CreateDirectory(FolderName);
             FilePath = @$"{FolderName}{Path.DirectorySeparatorChar}log_{Date:dd.MM.yyyy_HH.mm.ss}.log";
         }
-
         public void LogMessage(string message, string userID)
         {
             var data = $"Сообщение от {userID} в {DateTime.Now}{Environment.NewLine}{message}{Environment.NewLine}";
-            if (DateTime.Now - Date == TimeSpan.FromHours(24))
+            if (DateTime.Now - Date >= TimeSpan.FromHours(24))
                 CreateNewLogFile();
             File.AppendAllText(FilePath, data);
         }
