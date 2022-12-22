@@ -11,7 +11,8 @@ namespace TelegramBot
 {
     internal class Program
     {
-        const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI";
+        //const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //яппи
+        const string token = "5836576057:AAHhYfo9sBbEiD2WQE5SuBZV7O2vsZcLZK8"; //альфа-чаты
         //const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
         static ITelegramBotClient telegramBot = new TelegramBotClient(token);
         static MessageProcess messageProcess = new MessageProcess();
@@ -45,9 +46,10 @@ namespace TelegramBot
                         }
                     case string b when b.Contains("help"):
                         {
-                            var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}Днем с 12 до 16 - 15 обедов и 7 десятиминуток," +
-                            $"в остальное дневное время 10 обедов и 7 десятиминуток.{Environment.NewLine}" +
-                            $"Ночью - только 5 обедов и 5 десятиминуток.";
+                            //var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}Днем с 12 до 16 - 15 обедов и 10 десятиминуток," +
+                            //$"в остальное дневное время 10 обедов и 7 десятиминуток.{Environment.NewLine}" +
+                            //$"Ночью - только 5 обедов и 5 десятиминуток.";
+                            var rules = $"Лимит одновременных перерывов в один промежуток времени: 3 обеда и 3 десятиминутки.";
                             await bot.SendTextMessageAsync(chat, $"Правила отправки сообщений!{Environment.NewLine}Заполните по следующему образцу:{Environment.NewLine}" +
                             $"Время перерыва (пробел) Фамилия/Имя (пробел) Количество минут перерыва.{Environment.NewLine}" +
                             $"Например:{Environment.NewLine}{Environment.NewLine}18:30 Цаль Виталий 10{Environment.NewLine}{Environment.NewLine}" +
@@ -120,7 +122,6 @@ namespace TelegramBot
         }
         public static Task HandleErrorsAsync(ITelegramBotClient bot, Exception ex, CancellationToken cancellationToken)
         {
-            //Console.WriteLine(JsonSerializer.Serialize(ex.Message));
             Console.WriteLine(ex.Message);
             return Task.CompletedTask;
         }

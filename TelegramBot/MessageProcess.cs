@@ -22,6 +22,7 @@ namespace TelegramBot
         public string ErrorMessage { get; private set; }
         public void StartProcess(string messageText)
         {
+            //TODO: Этот метод требует рефакторинга, также выделить единый метод для обработки входящих данных (а не обработатывать их раздельно, как сейчас)
             ErrorMessage = String.Empty;
             IsErrorDetected = false;
             Message = messageText.Trim();
@@ -78,7 +79,7 @@ namespace TelegramBot
                     }
                     foreach (var item in MessageLines)
                     {
-                        if (item.ToString() == line)
+                        if (item.ToString() == line.Trim())
                         {
                             IsErrorDetected = true;
                             ErrorMessage += $"В {date:HH:mm} уже проставлен идентичный перерыв! Не дублируйте! Правильные перерывы записаны.{Environment.NewLine}{Environment.NewLine}";
@@ -105,7 +106,7 @@ namespace TelegramBot
             if (date - DateTime.Now <= TimeSpan.FromHours(18))
                 return true;
             IsErrorDetected = true;
-            ErrorMessage = $"Неправильный перерыв в {date:H:mm}! Перерыв поставлен слишком далеко, нельзя ставить более чем на 18 часов от момента написания. Измените этот конкретный перерыв и отправьте его заново." +
+            ErrorMessage += $"Неправильный перерыв в {date:H:mm}! Перерыв поставлен слишком далеко, нельзя ставить более чем на 18 часов от момента написания. Измените этот конкретный перерыв и отправьте его заново." +
                 $"{Environment.NewLine}{Environment.NewLine}";
             return false;
         }
@@ -128,8 +129,10 @@ namespace TelegramBot
         private bool CheckForFreeSlotsAndDub(DateTime date, int time)
         {
             var counter = 0;
-            var dinnerLimit = (date.Hour >= 22 || date.Hour < 6) ? 5 : (date.Hour >= 12 && date.Hour <= 16) ? 15 : 10;
-            var breakLimit = (date.Hour < 22 && date.Hour >= 6) ? 7 : 5;
+            //var dinnerLimit = (date.Hour >= 22 || date.Hour < 6) ? 5 : (date.Hour >= 12 && date.Hour <= 16) ? 15 : 10;  //яппи
+            //var breakLimit = (date.Hour >= 22 || date.Hour < 6) ? 5 : (date.Hour >= 12 && date.Hour <= 16) ? 10 : 7;    //яппи
+            var dinnerLimit = 3;    //цифромед
+            var breakLimit = 3;     //цифромед
             var isTenMinutes = time == TenMinutes ? true : false;
             foreach (var line in MessageLines)
             {
@@ -143,7 +146,7 @@ namespace TelegramBot
                     $"Правильные перерывы записаны!{Environment.NewLine}{Environment.NewLine}";
                 return false;
             }
-            if (counter >= dinnerLimit)
+            if (!isTenMinutes && counter >= dinnerLimit)
             {
                 IsErrorDetected = true;
                 ErrorMessage += $"В {date:H:mm} уже {dinnerLimit} обедов. Выберите для этого конкретного перерыва другое время и отправьте его заново. " +
@@ -225,7 +228,7 @@ namespace TelegramBot
                 IsErrorDetected = true;
                 foreach (var item in linesToDelete)
                 {
-                    ErrorMessage += $"Перерыв {item} в списке не найден!{Environment.NewLine}{Environment.NewLine}";
+                    ErrorMessage += $"Перерыв {string.Join(' ', item.Split(' ').Skip(1))} в списке не найден!{Environment.NewLine}{Environment.NewLine}";
                 }
             }
             DeleteOldDates();
