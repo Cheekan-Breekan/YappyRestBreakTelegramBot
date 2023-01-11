@@ -2,6 +2,7 @@
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types;
 using Telegram.Bot.Extensions.Polling;
+using Microsoft.Extensions.Configuration;
 
 namespace TelegramBot;
 public class TelegramUI
@@ -9,12 +10,15 @@ public class TelegramUI
     //const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //яппи
     //const string token = "5836576057:AAHhYfo9sBbEiD2WQE5SuBZV7O2vsZcLZK8"; //цифромед
     private const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
-
+    private readonly IConfiguration _config;
     private ITelegramBotClient telegramBot = new TelegramBotClient(token);
     Logger logger = new Logger();
 
     private Dictionary<long, MessageProcess> chats = new();
-
+    public TelegramUI(IConfiguration config)
+    {
+        _config = config;
+    }
     private async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cancellationToken)
     {
         if (update.Type == UpdateType.Message && update?.Message?.Text != null)
@@ -46,10 +50,14 @@ public class TelegramUI
                         }
                     case string c when c.Contains("help"):
                         {
-                            //var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}Днем с 12 до 16 - 15 обедов и 10 десятиминуток," +
-                            //$"в остальное дневное время 10 обедов и 7 десятиминуток.{Environment.NewLine}" +
-                            //$"Ночью - только 5 обедов и 5 десятиминуток.";
-                            var rules = $"Лимит одновременных перерывов в один промежуток времени: 3 обеда и 3 десятиминутки.";
+                            var rules = $"Количество перерывов в один промежуток времени:{Environment.NewLine}" +
+                            $"Днем с 12 до 16 - {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitDay")} обедов и " +
+                            $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitDay")} десятиминуток," +
+                            $"в остальное дневное время {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitBetween")} обедов и " +
+                            $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitBetween")} десятиминуток.{Environment.NewLine}" +
+                            $"Ночью - только {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitNight")} обедов и " +
+                            $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitNight")} десятиминуток.";
+
                             await bot.SendTextMessageAsync(chat, $"Правила отправки сообщений!{Environment.NewLine}Заполните по следующему образцу:{Environment.NewLine}" +
                             $"Время перерыва (пробел) Фамилия/Имя (пробел) Количество минут перерыва.{Environment.NewLine}" +
                             $"Например:{Environment.NewLine}{Environment.NewLine}18:30 Цаль Виталий 10{Environment.NewLine}{Environment.NewLine}" +
@@ -163,7 +171,7 @@ public class TelegramUI
             foreach (var line in FileOperations.ReadChatsId())
             {
                 long id = Convert.ToInt64(line);
-                chats.Add(id, new MessageProcess());
+                chats.Add(id, new MessageProcess(line, _config));
                 Console.WriteLine(id + " - айди чата загружен");
             }
         }

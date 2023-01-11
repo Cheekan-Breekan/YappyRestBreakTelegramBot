@@ -1,14 +1,38 @@
-﻿using System.Globalization;
+﻿using Microsoft.Extensions.Configuration;
+using System.Globalization;
 
 namespace TelegramBot
 {
     public class MessageProcess
     {
-        public List<UserMessageLine> MessageLines { get; private set; } = new();
-        public List<UserMessageLine> InputedMessageLines { get; private set; }
+        private readonly IConfiguration _config;
+        private readonly string _chatId;
+        private List<UserMessageLine> MessageLines { get; set; } = new();
+        private List<UserMessageLine> InputedMessageLines { get; set; }
         public bool IsErrorDetected { get; private set; }
         public string ErrorMessage { get; private set; }
         private string EndOfErrorMessage { get; } = $"Измените этот конкретный перерыв и отправьте его заново.{Environment.NewLine}{Environment.NewLine}";
+        private int DinnersLimitDay { get; set; }
+        private int DinnersLimitNight { get; set; }
+        private int DinnersLimitBetween { get; set; }
+        private int BreaksLimitDay { get; set; }
+        private int BreaksLimitNight { get; set; }
+        private int BreaksLimitBetween { get; set; }
+        public MessageProcess(string chatId, IConfiguration config)
+        {
+            _chatId = chatId;
+            _config = config;
+            ApplyLimits();
+        }
+        public void ApplyLimits()
+        {
+            DinnersLimitDay = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitDay");
+            DinnersLimitNight = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitNight");
+            DinnersLimitBetween = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitBetween");
+            BreaksLimitDay = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitDay");
+            BreaksLimitNight = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitNight");
+            BreaksLimitBetween = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitBetween");
+        }
         public void StartProcessing(string messageText, bool isToDelete = false, bool isToInsert = false)
         {
             ErrorMessage = String.Empty;
@@ -142,11 +166,9 @@ namespace TelegramBot
         }
         private bool CheckForFreeSlots(DateTime date, int time, int counter)
         {
-            //var dinnerLimit = (date.Hour >= 22 || date.Hour < 6) ? 5 : (date.Hour >= 12 && date.Hour <= 16) ? 15 : 10;  //яппи
-            //var breakLimit = (date.Hour >= 22 || date.Hour < 6) ? 5 : (date.Hour >= 12 && date.Hour <= 16) ? 10 : 7;    //яппи
-            var dinnerLimit = 3;    //цифромед
-            var breakLimit = 3;     //цифромед
-            var isTenMinutes = time == 10 ? true : false;
+            var dinnerLimit = (date.Hour >= 22 || date.Hour < 6) ? DinnersLimitNight : (date.Hour >= 12 && date.Hour <= 16) ? DinnersLimitDay : DinnersLimitBetween;
+            var breakLimit = (date.Hour >= 22 || date.Hour < 6) ? BreaksLimitNight : (date.Hour >= 12 && date.Hour <= 16) ? BreaksLimitDay : BreaksLimitBetween;
+            var isTenMinutes = time == 10;
 
             if (isTenMinutes && counter >= breakLimit)
             {
