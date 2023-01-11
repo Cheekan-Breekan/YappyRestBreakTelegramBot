@@ -1,144 +1,153 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
+﻿using System.Globalization;
 
 namespace TelegramBot
 {
     public class MessageProcess
     {
-        const int ThirtyMinutes = 30;
-        const int TenMinutes = 10;
-        const int ZeroMinutes = 0;
-        public string Message { get; private set; }
         public List<UserMessageLine> MessageLines { get; private set; } = new();
+        public List<UserMessageLine> InputedMessageLines { get; private set; }
         public bool IsErrorDetected { get; private set; }
         public string ErrorMessage { get; private set; }
-        public void StartProcess(string messageText)
+        private string EndOfErrorMessage { get; } = $"Измените этот конкретный перерыв и отправьте его заново.{Environment.NewLine}{Environment.NewLine}";
+        public void StartProcessing(string messageText, bool isToDelete = false, bool isToInsert = false)
         {
-            //TODO: Этот метод требует рефакторинга, также выделить единый метод для обработки входящих данных (а не обработатывать их раздельно, как сейчас)
             ErrorMessage = String.Empty;
             IsErrorDetected = false;
-            Message = messageText.Trim();
-            var tempLengthCheck = false;
-            var firstLine = false;
-            var counter = 0;
-            if (Message.Contains("insert"))
+            InputedMessageLines = new();
+            if (isToDelete)
             {
-                tempLengthCheck = true;
-                firstLine = true;
+                ProcessInputData(messageText, true);
+                DeleteLines();
+                return;
             }
-            try
+            else if (isToInsert)
             {
-                foreach (var line in Message.Split($"\n"))
+                ProcessInputData(messageText, true);
+            }
+            else
+            {
+                ProcessInputData(messageText, false);
+            }
+            if (InputedMessageLines.Count != 0)
+                ChecksAndInsertLines();
+        }
+        public void ProcessInputData(string messageText, bool isHasKeyword)
+        {
+            if (isHasKeyword)
+            {
+                messageText = messageText.Replace("delete", string.Empty);
+                messageText = messageText.Replace("insert", string.Empty);
+            }
+            var lines = messageText.Trim().Split($"\n").ToList();
+            if (lines.Count > 7 && !isHasKeyword)
+            {
+                IsErrorDetected = true;
+                ErrorMessage = "Неправильный ввод данных. Список перерывов никак не изменён! Слишком много перерывов, добавляйте лишь свои! ";
+                return;
+            }
+            foreach (var line in lines.ToList())
+            {
+                if (string.IsNullOrWhiteSpace(line)) { continue; }
+                DateTime date = new DateTime();
+                int time = 0;
+                string name = string.Empty;
+                var splittedLine = line.Trim().Split(' ');
+                try
                 {
-                    DateTime date = new DateTime();
-                    int time = 0;
-                    string name = null;
-                    if (string.IsNullOrWhiteSpace(line) || (tempLengthCheck && firstLine))
+                    date = ConvertToDate(splittedLine[0]);
+                    time = int.Parse(splittedLine.Last());
+                    var nonReadyName = string.Join(' ', splittedLine.Skip(1).SkipLast(1)).Trim();
+                    name = ConvertToName(nonReadyName);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                    IsErrorDetected = true;
+                    if (date == default)
+                        ErrorMessage += $"Присутствует грамматически неправильный перерыв {(line.Length > 30 ? "с неизвестным временем" : $"({line})")}! {ex.Message} {EndOfErrorMessage}";
+                    else
+                        ErrorMessage += $"Грамматически неправильный перерыв {(line.Length > 30 ? $"в {date:HH:mm}" : $"({line})")}! {ex.Message} {EndOfErrorMessage}";
+                    lines.Remove(line);
+                    continue;
+                }
+                InputedMessageLines.Add(new UserMessageLine(date, name, time));
+            }
+        }
+        public void ChecksAndInsertLines()
+        {
+            DeleteOldDates();
+            foreach (var lineToInsert in InputedMessageLines)
+            {
+                var date = lineToInsert.DinnerDate;
+                var time = lineToInsert.Minutes;
+                if (!CheckForRightDinnerTime(date, time))
+                    continue;
+                if (MessageLines.Count == 0)
+                {
+                    MessageLines.Add(lineToInsert);
+                    continue;
+                }
+                var counter = 0;
+                foreach (var line in MessageLines)
+                {
+                    if (line.DinnerDate == date && line.Minutes == time)
+                        counter++;
+                    if (CheckForDublicate(lineToInsert.ToString(), line.ToString(), date) && CheckForFreeSlots(date, time, counter))
                     {
-                        firstLine = false;
-                        continue;
-                    }
-                    var splittedLine = line.Trim().Split(' ');
-                    try
-                    {
-                        date = ConvertToDate(splittedLine[0]);
-                        time = int.Parse(splittedLine.Last());
-                        name = ConvertToName(line, splittedLine);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex);
-                        IsErrorDetected = true;
-                        if (counter == 0)
+                        if (MessageLines.First().DinnerDate > date)
                         {
-                            ErrorMessage += $"Неверный ввод данных! Список перерывов никак не изменён.";
-                            return;
+                            MessageLines.Insert(0, lineToInsert);
+                            break;
                         }
-                        if (date == default)
-                            ErrorMessage += $"Присутствует грамматически неправильный перерыв {(line.Length > 50 ? "с неизвестным временем" : $"({line})")}!" +
-                                $" Измените этот конкретный перерыв и отправьте его заново. " +
-                                $"Правильные перерывы записаны!{Environment.NewLine}{Environment.NewLine}";
-                        else
-                            ErrorMessage += $"Грамматически неправильный перерыв {(line.Length > 50 ? $"в {date:HH:mm}" : $"({line})")}! Измените этот конкретный перерыв и отправьте его заново. " +
-                                $"Правильные перерывы записаны!{Environment.NewLine}{Environment.NewLine}";
-                        continue;
-                    }
-                    if (Message.Split($"\n").Count() > 7 && !tempLengthCheck)
-                    {
-                        IsErrorDetected = true;
-                        ErrorMessage = "Неправильный ввод данных. Список перерывов никак не изменён! Вы вносите слишком много перерывов, добавляйте лишь свои!";
-                        return;
-                    }
-                    foreach (var item in MessageLines)
-                    {
-                        if (item.ToString() == line.Trim())
+                        if (line.DinnerDate > date)
                         {
-                            IsErrorDetected = true;
-                            ErrorMessage += $"В {date:HH:mm} уже проставлен идентичный перерыв! Не дублируйте! Правильные перерывы записаны.{Environment.NewLine}{Environment.NewLine}";
-                            goto here;
+                            var index = MessageLines.IndexOf(line);
+                            MessageLines.Insert(index, lineToInsert);
+                            break;
+                        }
+                        else if (line.DinnerDate <= date && MessageLines.IndexOf(line) == MessageLines.Count - 1)
+                        {
+                            MessageLines.Add(lineToInsert);
+                            break;
                         }
                     }
-                    if (CheckForRightDinnerTime(date, time) && CheckForFreeSlotsAndDub(date, time) && CheckForTooFarTime(date))
-                    {
-                        InsertInList(date, name, time);
-                    }
-                    here: counter++;
+                    else { break; }
                 }
             }
-            catch (Exception ex)
+        }
+        private bool CheckForDublicate(string lineToInsert, string currentLine, DateTime date)
+        {
+            if (lineToInsert == currentLine)
             {
-                Console.WriteLine(ex);
                 IsErrorDetected = true;
-                ErrorMessage = "Неправильный ввод данных! " + ex;
-            }
+                ErrorMessage += $"В {date:HH:mm} уже проставлен идентичный перерыв! Не дублируйте! Правильные перерывы записаны.{Environment.NewLine}{Environment.NewLine}";
+                return false;
+            } 
+            return true;
         }
-
-        private bool CheckForTooFarTime(DateTime date)
+        private bool CheckForRightDinnerTime(DateTime date, int time) //TODO: Передвинуть из цикла форича, достаточно проверить всего 1 раз
         {
-            if (date - DateTime.Now <= TimeSpan.FromHours(18))
-                return true;
-            IsErrorDetected = true;
-            ErrorMessage += $"Неправильный перерыв в {date:H:mm}! Перерыв поставлен слишком далеко, нельзя ставить более чем на 18 часов от момента написания. Измените этот конкретный перерыв и отправьте его заново." +
-                $"{Environment.NewLine}{Environment.NewLine}";
-            return false;
-        }
-
-        private bool CheckForRightDinnerTime(DateTime date, int time)
-        {
-            var rightTime = time == TenMinutes || time == ThirtyMinutes;
+            var rightTime = time == 10 || time == 30;
             int dateMinutes = date.Minute;
-            if (time == TenMinutes && (dateMinutes % TenMinutes == 0))
+            if (time == 10 && (dateMinutes % 10 == 0))
                 return true;
-            if (time == ThirtyMinutes && (ZeroMinutes == dateMinutes || ThirtyMinutes == dateMinutes))
+            if (time == 30 && (0 == dateMinutes || 30 == dateMinutes))
                 return true;
             IsErrorDetected = true;
             ErrorMessage += $"Неправильный перерыв в {date:H:mm}! Измените этот конкретный перерыв и отправьте его заново. " +
                 $"Правильные перерывы записаны!{Environment.NewLine}{(rightTime ? "" : "Перерывы могут быть либо 10 минут, либо 30. ")}" +
-                $"{(time == ThirtyMinutes ? "Обеды допустимы только в :00 минут и в :30 минут." : "")}" +
-                $"{(time == TenMinutes ? "Десятиминутки допустимы в любую минуту, кратную 10." : "")}{Environment.NewLine}{Environment.NewLine}";
+                $"{(time == 30 ? "Обеды допустимы только в :00 минут и в :30 минут." : "")}" +
+                $"{(time == 10 ? "Десятиминутки допустимы в любую минуту, кратную 10." : "")}{Environment.NewLine}{Environment.NewLine}";
             return false;
         }
-        private bool CheckForFreeSlotsAndDub(DateTime date, int time)
+        private bool CheckForFreeSlots(DateTime date, int time, int counter)
         {
-            var counter = 0;
             //var dinnerLimit = (date.Hour >= 22 || date.Hour < 6) ? 5 : (date.Hour >= 12 && date.Hour <= 16) ? 15 : 10;  //яппи
             //var breakLimit = (date.Hour >= 22 || date.Hour < 6) ? 5 : (date.Hour >= 12 && date.Hour <= 16) ? 10 : 7;    //яппи
             var dinnerLimit = 3;    //цифромед
             var breakLimit = 3;     //цифромед
-            var isTenMinutes = time == TenMinutes ? true : false;
-            foreach (var line in MessageLines)
-            {
-                if (line.DinnerDate == date && line.Minutes == time)
-                    counter++;
-            }
+            var isTenMinutes = time == 10 ? true : false;
+
             if (isTenMinutes && counter >= breakLimit)
             {
                 IsErrorDetected = true;
@@ -154,34 +163,6 @@ namespace TelegramBot
                 return false;
             }
             return true;
-        }
-        private void InsertInList(DateTime date, string info, int time)
-        {
-            DeleteOldDates();
-            var newLine = new UserMessageLine(date, info, time);
-            if (MessageLines.Count == 0)
-            {
-                MessageLines.Add(newLine);
-                return;
-            }
-            if (MessageLines.First().DinnerDate > date)
-            {
-                MessageLines.Insert(0, newLine);
-                return;
-            }
-            foreach (var line in MessageLines.ToList())
-            {
-                if (line.DinnerDate > date)
-                {
-                    var index = MessageLines.IndexOf(line);
-                    MessageLines.Insert(index, newLine);
-                    break;
-                }
-                else if (line.DinnerDate <= date && MessageLines.IndexOf(line) == MessageLines.Count - 1)
-                {
-                    MessageLines.Add(newLine);
-                }
-            }
         }
         private void DeleteOldDates()
         {
@@ -205,48 +186,47 @@ namespace TelegramBot
             }
             return fullMessage;
         }
-        public void DeleteLines(string needToDelete)
+        public void DeleteLines()
         {
-            var linesToDelete = needToDelete.Split($"\n").ToList();
-            ErrorMessage = String.Empty;
-            foreach (var item in linesToDelete.ToList())
+            DeleteOldDates();
+            foreach (var lineToDelete in InputedMessageLines.ToList())
             {
-                var lineToDelete = string.Join(' ', item.Split(' ').Skip(1));
-                foreach (var lineInMessages in MessageLines.ToList())
+                var textLineToDelete = lineToDelete.ToString();
+                foreach (var line in MessageLines.ToList())
                 {
-                    if (lineInMessages.ToString() == lineToDelete)
+                    if (textLineToDelete == line.ToString())
                     {
+                        MessageLines.Remove(line);
+                        InputedMessageLines.Remove(lineToDelete);
                         ErrorMessage += $"Перерыв {lineToDelete} удалён.{Environment.NewLine}{Environment.NewLine}";
-                        MessageLines.Remove(lineInMessages);
-                        linesToDelete.Remove(item);
                         break;
                     }
                 }
             }
-            if (linesToDelete.Count() != 0) 
-            { 
+            if (InputedMessageLines.Count() != 0)
+            {
                 IsErrorDetected = true;
-                foreach (var item in linesToDelete)
+                foreach (var line in InputedMessageLines)
                 {
-                    ErrorMessage += $"Перерыв {string.Join(' ', item.Split(' ').Skip(1))} в списке не найден!{Environment.NewLine}{Environment.NewLine}";
+                    ErrorMessage += $"Перерыв {string.Join(' ', line.ToString().Split(' ').Skip(1))} в списке не найден!{Environment.NewLine}{Environment.NewLine}";
                 }
             }
-            DeleteOldDates();
         }
         public void ClearList() => MessageLines.Clear();
-        private string ConvertToName(string line, string[] splittedLine)
+        private string ConvertToName(string name)
         {
-            var name = line.Replace(splittedLine.First(), "").Replace(splittedLine.Last(), "").Trim();
-            if (string.IsNullOrWhiteSpace(name)) { throw new Exception("Имя/Фамилия пусты"); }
-            if (name.Length > 50) { throw new Exception("Слишком длинные имя/фамилия"); }
-            if (name.Any(char.IsDigit)) { throw new Exception("Имя/Фамилия содержат цифры"); }
+            if (string.IsNullOrWhiteSpace(name)) { throw new Exception("Имя/Фамилия пусты."); }
+            if (name.Length > 50) { throw new Exception("Слишком длинные имя/фамилия."); }
+            if (name.Any(char.IsDigit)) { throw new Exception("Имя/Фамилия содержат цифры."); }
             return name;
         }
         private DateTime ConvertToDate(string time)
         {
             var date = DateTime.ParseExact(time, "H:m", CultureInfo.CurrentCulture);
             if (date < DateTime.Now)
-                return date + TimeSpan.FromHours(24);
+                date += TimeSpan.FromHours(24);
+            if (date - DateTime.Now >= TimeSpan.FromHours(18))
+                throw new Exception($"Перерыв стоит слишком далеко по времени, более чем через 18 часов.");
             return date;
         }
     }
