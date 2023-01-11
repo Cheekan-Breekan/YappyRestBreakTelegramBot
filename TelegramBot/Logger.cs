@@ -12,8 +12,7 @@
         private void CreateNewLogFile()
         {
             Date = DateTime.Now;
-            if (!Directory.Exists(FolderName))
-                Directory.CreateDirectory(FolderName);
+            Directory.CreateDirectory(FolderName);
             FilePath = @$"{FolderName}{Path.DirectorySeparatorChar}log_{Date:dd.MM.yyyy_HH.mm.ss}.log";
         }
         public void LogMessage(string message, string userID)
