@@ -3,19 +3,20 @@ using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types;
 using Telegram.Bot.Extensions.Polling;
 using Microsoft.Extensions.Configuration;
-using System.Diagnostics;
 using System;
 using System.IO;
+using System.Collections.Generic;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace TelegramBot;
 public class TelegramUI
 {
-    const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //яппи
+    //const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //яппи
     //const string token = "5836576057:AAHhYfo9sBbEiD2WQE5SuBZV7O2vsZcLZK8"; //цифромед
-    //private const string token = "5620311832:AAGVmmVQE0rkz7NNfI28Hkfo97ZLy2u3Arc"; //тестовый
+    private const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
     private readonly IConfiguration _config;
     private readonly ITelegramBotClient _telegramBot = new TelegramBotClient(token);
-    readonly Logger _logger = new();
+    readonly Logger _logger = new(); //TODO: Реализовать уже логгер
 
     private Dictionary<long, MessageProcess> chats = new();
     public TelegramUI(IConfiguration config)
@@ -24,8 +25,6 @@ public class TelegramUI
     }
     private async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cToken)
     {
-        var sw = Stopwatch.StartNew();
-
         if (update.Type == UpdateType.Message && update?.Message?.Text != null)
         {
             var message = update.Message;
@@ -33,7 +32,7 @@ public class TelegramUI
             var chat = message.Chat;
             var text = message.Text;
             var id = message.MessageId;
-            var author = message.From.ToString();
+            var author = message.From.Username;
             try
             {
 
@@ -53,7 +52,7 @@ public class TelegramUI
 
                 _logger.LogMessage(text, author);
 
-                switch (text.ToLower())
+                switch (text.ToLower()) //TODO: свитч в отдельный метод? Вынести админские методы в отдельный if блок!
                 {
                     case string a when a.Contains("оффтоп"): { break; }
                     case string b when b.Contains("delete"):
@@ -86,27 +85,20 @@ public class TelegramUI
                             await PrepareAnswer(bot, chat, id, messageProcess);
                             break;
                         }
-                    case string g when g.Contains("addchatid"):
-                        {
-                            if (SaveNewChatId(text))
-                                await bot.SendTextMessageAsync(chat, "Айди успешно добавлен", cancellationToken: cToken);
-                            else
-                                await bot.SendTextMessageAsync(chat, "Не удалось добавить айди! Проверьте правильность сообщения: \"addchatid АЙДИ\"", cancellationToken: cToken);
-                            break;
-                        }
-                    case string h when h.Contains("newlimits"):
+                    case string g when g.Contains("newlimits"):
                         {
                             messageProcess.ApplyLimits();
                             await bot.SendTextMessageAsync(chatId, $"Новые лимиты применены.{Environment.NewLine}{PrepareRulesMessage(chatId)}", cancellationToken: cToken);
                             break;
                         }
-                    case string j when j.Contains("download"):
+                    case string h when h.Contains("download"):
                         {
                             if (FileOperations.ReadId("access").Contains(author))
                             {
-                                var fileName = text.Skip(9).ToString();
+                                var fileName = string.Concat(text.Skip(9)) + ".json";
                                 using Stream stream = System.IO.File.OpenRead(fileName);
-                                await bot.SendDocumentAsync(chatId, stream, cancellationToken: cToken);
+                                var iof = new Telegram.Bot.Types.InputFiles.InputOnlineFile(stream, fileName);
+                                await bot.SendDocumentAsync(chatId, iof, cancellationToken: cToken);
                             }
                             break;
                         }
@@ -121,13 +113,41 @@ public class TelegramUI
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                await bot.SendTextMessageAsync(chatId, "Произошла непредвиденная ошибка при отправлении ответного сообщения! Пожалуйста, сообщите о ней.");
+                await bot.SendTextMessageAsync(chatId, "Произошла непредвиденная ошибка при отправлении ответного сообщения! Пожалуйста, сообщите о ней. 😰");
             }
         }
-        sw.Stop();
-        Console.WriteLine(sw.Elapsed.TotalMilliseconds);
+        else if (update.Message.Document is not null) //TODO: Вынести в отдельный метод?
+        {
+            var message = update.Message;
+            var doc = message.Document;
+            if (!CheckForFileName(doc.FileName)) { return; }
+            if (FileOperations.ReadId("access").Contains(message.From.Username))
+            {
+                var file = await bot.GetFileAsync(doc.FileId);
+                var fileName = AppDomain.CurrentDomain.BaseDirectory + doc.FileName;
+                using var stream = new FileStream(fileName, FileMode.Create);
+                await bot.DownloadFileAsync(file.FilePath, stream, cToken);
+            }
+            else
+            {
+                await bot.SendTextMessageAsync(message.Chat.Id, 
+                    $"У вас нет прав для данной операции! Товарищ @{message.From.Username}! Эй, @MrSega13, тут кто-то балуется 😡",
+                    replyToMessageId: message.MessageId);
+            }
+        }
     }
-
+    private bool CheckForFileName(string fileName)
+    {
+        var list = new List<string>()
+        {
+            "chats.json",
+            "access.json",
+            "appsettings.json"
+        };
+        if (list.Any(s => s.Contains(fileName)))
+            return true;
+        return false;
+    }
     private string PrepareHelpMessage(long chatId)
     {
         var rules = PrepareRulesMessage(chatId);
@@ -152,7 +172,7 @@ public class TelegramUI
     {
         return $"Количество перерывов в один промежуток времени:{Environment.NewLine}" +
                             $"Днем с 12 до 16 - {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitDay")} обедов и " +
-                            $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitDay")} десятиминуток," +
+                            $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitDay")} десятиминуток, " +
                             $"в остальное дневное время {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitBetween")} обедов и " +
                             $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitBetween")} десятиминуток.{Environment.NewLine}" +
                             $"Ночью - только {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitNight")} обедов и " +
@@ -167,7 +187,7 @@ public class TelegramUI
     }
     private async Task SendAnswer(ITelegramBotClient bot, string answer, int length, Chat chat, int id)
     {
-        try
+        try //TODO: Посмотреть этот метод, пора бы его привести в красивый вид
         {
             if (length > 0 && length < 3000)
                 await bot.SendTextMessageAsync(chat, answer, replyToMessageId: id);
@@ -214,38 +234,16 @@ public class TelegramUI
         {
             foreach (var line in FileOperations.ReadId("chats"))
             {
-                long id = Convert.ToInt64(line);
-                chats.Add(id, new MessageProcess(line, _config));
-                Console.WriteLine(id + " - айди чата загружен");
+                if (long.TryParse(line, out var id))
+                {
+                    chats.Add(id, new MessageProcess(line, _config));
+                    Console.WriteLine(id + " - айди чата загружен");
+                }
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Произошла непредвиденная ошибка при загрузке id чата {ex}");
         }
-
-    }
-    private bool SaveNewChatId(string message)
-    {
-        try
-        {
-            var strId = message.Replace("addchatid", "").Trim();
-            if (long.TryParse(strId, out long id))
-            {
-
-                foreach (var line in FileOperations.ReadId("chats"))
-                {
-                    if (line == id.ToString())
-                        return false;
-                }
-                FileOperations.WriteChatId(id);
-                return true;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
-        return false;
     }
 }

@@ -14,8 +14,4 @@ public static class FileOperations
 		}
 		return list;
     }
-	public static void WriteChatId(long chatId)
-	{
-		File.AppendAllText($"Id{Path.DirectorySeparatorChar}chats.txt", $"{Environment.NewLine}{chatId}");
-	}
 }
