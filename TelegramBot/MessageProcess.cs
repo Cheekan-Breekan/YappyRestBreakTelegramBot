@@ -149,7 +149,7 @@ namespace TelegramBot
             } 
             return true;
         }
-        private bool CheckForRightDinnerTime(DateTime date, int time) //TODO: Передвинуть из цикла форича, достаточно проверить всего 1 раз
+        private bool CheckForRightDinnerTime(DateTime date, int time)
         {
             var rightTime = time == 10 || time == 30;
             int dateMinutes = date.Minute;
@@ -192,6 +192,8 @@ namespace TelegramBot
             {
                 if (line.DinnerDate < DateTime.Now)
                     MessageLines.Remove(line);
+                else
+                    return;
             }
         }
         public string GetFullMessage()
@@ -225,7 +227,7 @@ namespace TelegramBot
                     }
                 }
             }
-            if (InputedMessageLines.Count() != 0)
+            if (InputedMessageLines.Count != 0)
             {
                 IsErrorDetected = true;
                 foreach (var line in InputedMessageLines)

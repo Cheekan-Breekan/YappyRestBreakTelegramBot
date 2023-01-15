@@ -1,12 +1,12 @@
 ﻿namespace TelegramBot;
 public static class FileOperations
 {
-    public static List<string> ReadChatsId()
+    public static List<string> ReadId(string fileName)
     {
         var list = new List<string>();
 		try
 		{
-			list.AddRange(File.ReadAllLines($"ChatsId{Path.DirectorySeparatorChar}id.txt").ToList());
+			list.AddRange(File.ReadAllLines($"{AppDomain.CurrentDomain.BaseDirectory}{Path.DirectorySeparatorChar}{fileName}.json").ToList());
 		}
 		catch (Exception ex)
 		{
@@ -16,7 +16,6 @@ public static class FileOperations
     }
 	public static void WriteChatId(long chatId)
 	{
-		Directory.CreateDirectory("ChatsId");
-		File.AppendAllText($"ChatsId{Path.DirectorySeparatorChar}id.txt", $"{Environment.NewLine}{chatId}");
+		File.AppendAllText($"Id{Path.DirectorySeparatorChar}chats.txt", $"{Environment.NewLine}{chatId}");
 	}
 }
