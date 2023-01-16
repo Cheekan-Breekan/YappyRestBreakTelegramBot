@@ -85,7 +85,7 @@ public class TelegramUI
                             await PrepareAnswer(bot, chat, id, messageProcess);
                             break;
                         }
-                    case string g when g.Contains("newlimits"):
+                    case string g when g.Contains("applylimits"):
                         {
                             messageProcess.ApplyLimits();
                             await bot.SendTextMessageAsync(chatId, $"Новые лимиты применены.{Environment.NewLine}{PrepareRulesMessage(chatId)}", cancellationToken: cToken);
@@ -100,6 +100,14 @@ public class TelegramUI
                                 var iof = new Telegram.Bot.Types.InputFiles.InputOnlineFile(stream, fileName);
                                 await bot.SendDocumentAsync(chatId, iof, cancellationToken: cToken);
                             }
+                            break;
+                        }
+                    case string k when k.Contains("restorebackup"):
+                        {
+                            FileOperations.RestoreDefault();
+                            await bot.SendTextMessageAsync(chatId,
+                                $"Восстановлены все значения по умолчанию. Для применения лимитов используйте команду applylimits",
+                                cancellationToken: cToken);
                             break;
                         }
                     default:
@@ -121,7 +129,7 @@ public class TelegramUI
             var message = update.Message;
             var doc = message.Document;
             if (!CheckForFileName(doc.FileName)) { return; }
-            if (FileOperations.ReadId("access").Contains(message.From.Username))
+            if (FileOperations.ReadId("access").Contains(message.From.Id.ToString()))
             {
                 var file = await bot.GetFileAsync(doc.FileId);
                 var fileName = AppDomain.CurrentDomain.BaseDirectory + doc.FileName;
@@ -239,6 +247,7 @@ public class TelegramUI
                     chats.Add(id, new MessageProcess(line, _config));
                     Console.WriteLine(id + " - айди чата загружен");
                 }
+                else { Console.WriteLine(line + " - не удалось загрузить айди! Ошибка!"); }
             }
         }
         catch (Exception ex)
