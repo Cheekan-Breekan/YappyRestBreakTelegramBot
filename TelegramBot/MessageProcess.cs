@@ -85,7 +85,8 @@ namespace TelegramBot
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
+                    Log.Information(ex.Message);
+                    Log.Debug(ex.ToString());
                     IsErrorDetected = true;
                     if (date == default)
                         ErrorMessage += $"Присутствует грамматически неправильный перерыв {(line.Length > 30 ? "с неизвестным временем" : $"({line})")}! {ex.Message} {EndOfErrorMessage}";
@@ -201,6 +202,7 @@ namespace TelegramBot
             if (IsErrorDetected)
             {
                 IsErrorDetected = false;
+                Log.Information(ErrorMessage);
                 return ErrorMessage += "Используйте команду \"help\" для помощи и команду \"список\" для отображения актуального списка.";
             }
             DeleteOldDates();

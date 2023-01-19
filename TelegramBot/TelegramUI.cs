@@ -15,7 +15,6 @@ public class TelegramUI
     private readonly ITelegramBotClient _telegramBot = new TelegramBotClient(token);
     private const string accessFile = "access";
     private const string chatsFile = "chats";
-    readonly Logger _logger = new(); //TODO: Реализовать уже логгер
 
     private Dictionary<long, MessageProcess> chats;
     public TelegramUI(IConfiguration config)
@@ -35,10 +34,11 @@ public class TelegramUI
             var authorName = message.From.Username;
             try
             {
-                Console.WriteLine($"Сообщение от {authorName} в чате {chatId}: " + text);
+                Log.Information($"В чате: {chat.Username} ({chatId}) от {authorName} ({author}) сообщение: {text}");
                 if (!chats.ContainsKey(chatId))
                 {
                     await bot.SendTextMessageAsync(chat, "Нет прав писать этому боту.", cancellationToken: cToken);
+                    Log.Warning("Нет прав писать этому боту.");
                     return;
                 }
                 var messageProcess = chats[chatId];
@@ -49,12 +49,11 @@ public class TelegramUI
                     messageProcess = chats[long.Parse(desiredChat)];
                     text = string.Concat(splitText.Skip(1));
                 }
-                _logger.LogMessage(text, authorName);
                 await CheckMessageForKeywords(bot, chatId, chat, text, id, author, messageProcess, cToken);
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex);
+                Log.Error(ex, "Ошибка в HandleUpdateAsync");
                 await bot.SendTextMessageAsync(chatId, "Произошла ошибка при отправлении ответного сообщения!" +
                     "Проверьте правильность своего сообщения. Если ошибка не исправляется, то пожалуйста, сообщите о ней. 😰");
             }
@@ -63,17 +62,20 @@ public class TelegramUI
         {
             var message = update.Message;
             var doc = message.Document;
-            if (!CheckForFileName(doc.FileName)) { return; }
+            var docName = doc.FileName;
+            if (!CheckForFileName(docName)) { return; }
+            Log.Warning($"Скачивание документа настроек {docName} в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
             if (FileOperations.ReadId(chatsFile).Contains(message.Chat.Id.ToString()) 
                 && FileOperations.ReadId(accessFile).Contains(message.From.Id.ToString()))
             {
                 var file = await bot.GetFileAsync(doc.FileId);
-                var fileName = AppDomain.CurrentDomain.BaseDirectory + doc.FileName;
+                var fileName = AppDomain.CurrentDomain.BaseDirectory + docName;
                 using var stream = new FileStream(fileName, FileMode.Create);
                 await bot.DownloadFileAsync(file.FilePath, stream, cToken);
             }
             else
             {
+                Log.Error($"Несанкционированный доступ к перезаписи настроек бота!!!");
                 await bot.SendTextMessageAsync(message.Chat.Id, 
                     $"У вас нет прав для данной операции! Товарищ @{message.From.Username}! Эй, @MrSega13, тут кто-то балуется 😡",
                     replyToMessageId: message.MessageId);
@@ -108,7 +110,7 @@ public class TelegramUI
                     {
                         messageProcess.ClearList();
                         await bot.SendTextMessageAsync(chat, "Список перерывов полностью очищен!", replyToMessageId: id, cancellationToken: cToken);
-                        _logger.LogMessage("Список перерывов полностью очищен!", "BOT");
+                        Log.Logger.Information("Список перерывов полностью очищен!", "BOT");
                     }
                     break;
                 }
@@ -127,6 +129,7 @@ public class TelegramUI
                     {
                         messageProcess.ApplyLimits();
                         await bot.SendTextMessageAsync(chatId, $"Новые лимиты применены.{Environment.NewLine}{PrepareRulesMessage(chatId)}", cancellationToken: cToken);
+                        Log.Warning("Применение новых лимитов");
                     }
                     break;
                 }
@@ -138,6 +141,7 @@ public class TelegramUI
                         using Stream stream = System.IO.File.OpenRead(fileName);
                         var iof = new Telegram.Bot.Types.InputFiles.InputOnlineFile(stream, fileName);
                         await bot.SendDocumentAsync(chatId, iof, cancellationToken: cToken);
+                        Log.Warning("Скачивание настроек");
                     }
                     break;
                 }
@@ -149,6 +153,7 @@ public class TelegramUI
                         await bot.SendTextMessageAsync(chatId,
                             $"Восстановлены все значения по умолчанию. Для применения лимитов используйте команду applylimits. Для перезагрузки прав доступа - applyids",
                             cancellationToken: cToken);
+                        Log.Warning("Восстановление значений настроек по умолчанию");
                     }
                     break;
                 }
@@ -160,6 +165,7 @@ public class TelegramUI
                         await bot.SendTextMessageAsync(chatId,
                             $"Новые значения доступа к боту применены.",
                             cancellationToken: cToken);
+                        Log.Warning("Добавление новых людей в whitelist доступа к боту");
                     }
                     break;
                 }
@@ -233,21 +239,24 @@ public class TelegramUI
                 }
             }
             else
+            {
                 await bot.SendTextMessageAsync(chat, "Произошла непредвиденная ошибка при отправлении ответного сообщения! Пожалуйста, сообщите о ней.", replyToMessageId: id);
+                Log.Error("Ошибка! Не произошла отправка обратного сообщения!");
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex);
+            Log.Error(ex, "Ошибка! Не произошла отправка обратного сообщения!");
         }
     }
     private static Task HandleErrorsAsync(ITelegramBotClient bot, Exception ex, CancellationToken cancellationToken)
     {
-        Console.WriteLine(ex.Message);
+        Log.Fatal(ex, "Ошибка! Фатальная ошибка приложения!!!");
         return Task.CompletedTask;
     }
     public void StartBot()
     {
-        Console.WriteLine("Бот запущен: " + _telegramBot.GetMeAsync().Result.FirstName);
+        Log.Warning("Бот запущен: " + _telegramBot.GetMeAsync().Result.FirstName);
         LoadSavedChatsId();
         var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
@@ -267,14 +276,14 @@ public class TelegramUI
                 if (long.TryParse(line, out var id))
                 {
                     chats.Add(id, new MessageProcess(line, _config));
-                    Console.WriteLine(id + " - айди чата загружен");
+                    Log.Warning(id + " - айди чата загружен");
                 }
-                else { Console.WriteLine(line + " - не удалось загрузить айди! Ошибка!"); }
+                else { Log.Error(line + " - не удалось загрузить айди! Ошибка!"); }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Произошла непредвиденная ошибка при загрузке id чата {ex}");
+            Log.Fatal($"Произошла непредвиденная ошибка при загрузке id чата {ex}");
         }
     }
 }

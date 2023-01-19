@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿global using Serilog;
+using Microsoft.Extensions.Configuration;
 
 namespace TelegramBot
 {
@@ -8,6 +9,11 @@ namespace TelegramBot
         {
             var builder = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true);
             var config = builder.Build();
+
+            Log.Logger = new LoggerConfiguration().MinimumLevel.Debug()
+                .WriteTo.Console(Serilog.Events.LogEventLevel.Warning).WriteTo.File("Logs\\log .txt", rollingInterval: RollingInterval.Day, shared: true)
+                .CreateLogger();
+
             var telegramUI = new TelegramUI(config);
             telegramUI.StartBot();
             Console.ReadLine();

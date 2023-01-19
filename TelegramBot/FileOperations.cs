@@ -10,7 +10,7 @@ public static class FileOperations
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine(ex);
+			Log.Fatal(ex, $"Ошибка! Не удалось прочесть файл {fileName}");
 		}
 		return list;
     }
