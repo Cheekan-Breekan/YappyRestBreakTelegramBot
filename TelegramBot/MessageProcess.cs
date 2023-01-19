@@ -203,6 +203,7 @@ namespace TelegramBot
                 IsErrorDetected = false;
                 return ErrorMessage += "Используйте команду \"help\" для помощи и команду \"список\" для отображения актуального списка.";
             }
+            DeleteOldDates();
             string fullMessage = String.Empty;
             foreach (var line in MessageLines)
             {
