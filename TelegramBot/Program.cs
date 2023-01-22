@@ -11,7 +11,7 @@ namespace TelegramBot
             var config = builder.Build();
 
             Log.Logger = new LoggerConfiguration().MinimumLevel.Debug()
-                .WriteTo.Console(Serilog.Events.LogEventLevel.Warning).WriteTo.File("Logs\\log .txt", rollingInterval: RollingInterval.Day, shared: true)
+                .WriteTo.Console(Serilog.Events.LogEventLevel.Warning).WriteTo.File($"Logs{Path.DirectorySeparatorChar}log .txt", rollingInterval: RollingInterval.Day, shared: true)
                 .CreateLogger();
 
             var telegramUI = new TelegramUI(config);

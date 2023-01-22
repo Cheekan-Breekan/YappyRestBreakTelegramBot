@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 namespace TelegramBot;
 public class TelegramUI
 {
-    //const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //яппи
+    //const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //основной (бывший яппи)
     //const string token = "5836576057:AAHhYfo9sBbEiD2WQE5SuBZV7O2vsZcLZK8"; //цифромед
     private const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
     private readonly IConfiguration _config;
@@ -23,17 +23,17 @@ public class TelegramUI
     }
     private async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cToken)
     {
-        if (update.Type == UpdateType.Message && update?.Message?.Text != null)
+        try
         {
-            var message = update.Message;
-            var chatId = message.Chat.Id;
-            var chat = message.Chat;
-            var text = message.Text;
-            var id = message.MessageId;
-            var author = message.From.Id.ToString();
-            var authorName = message.From.Username;
-            try
+            if (update.Type == UpdateType.Message && update?.Message?.Text != null)
             {
+                var message = update.Message;
+                var chatId = message.Chat.Id;
+                var chat = message.Chat;
+                var text = message.Text;
+                var id = message.MessageId;
+                var author = message.From.Id.ToString();
+                var authorName = message.From.Username;
                 Log.Information($"В чате: {chat.Username} ({chatId}) от {authorName} ({author}) сообщение: {text}");
                 if (!chats.ContainsKey(chatId))
                 {
@@ -47,44 +47,47 @@ public class TelegramUI
                     var splitText = text.Split("\n");
                     var desiredChat = string.Concat(splitText[0].Skip(11));
                     messageProcess = chats[long.Parse(desiredChat)];
-                    text = string.Concat(splitText.Skip(1));
+                    text = string.Join("\n", splitText.Skip(1));
                 }
                 await CheckMessageForKeywords(bot, chatId, chat, text, id, author, messageProcess, cToken);
             }
-            catch (Exception ex)
+            else if (update?.Message?.Document is not null)
             {
-                Log.Error(ex, "Ошибка в HandleUpdateAsync");
-                await bot.SendTextMessageAsync(chatId, "Произошла ошибка при отправлении ответного сообщения!" +
-                    "Проверьте правильность своего сообщения. Если ошибка не исправляется, то пожалуйста, сообщите о ней. 😰");
+                var message = update.Message;
+                var doc = message.Document;
+                var docName = doc.FileName;
+                if (!CheckForFileName(docName)) { return; }
+                Log.Warning($"Скачивание документа настроек {docName} в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
+                if (FileOperations.ReadId(chatsFile).Contains(message.Chat.Id.ToString())
+                    && FileOperations.ReadId(accessFile).Contains(message.From.Id.ToString()))
+                {
+                    var file = await bot.GetFileAsync(doc.FileId);
+                    var fileName = AppDomain.CurrentDomain.BaseDirectory + docName;
+                    using var stream = new FileStream(fileName, FileMode.Create);
+                    await bot.DownloadFileAsync(file.FilePath, stream, cToken);
+                    await bot.SendTextMessageAsync(message.Chat.Id,
+                            $"Файл установлен. Для применения лимитов используйте команду applylimits. Для перезагрузки прав доступа - applyids",
+                            cancellationToken: cToken);
+                }
+                else
+                {
+                    Log.Error($"Несанкционированный доступ к перезаписи настроек бота!!!");
+                    await bot.SendTextMessageAsync(message.Chat.Id,
+                        $"У вас нет прав для данной операции! Товарищ @{message.From.Username}! Эй, @MrSega13, тут кто-то балуется 😡",
+                        replyToMessageId: message.MessageId);
+                }
             }
         }
-        else if (update.Message.Document is not null) //TODO: Вынести в отдельный метод?
+        catch (Exception ex)
         {
-            var message = update.Message;
-            var doc = message.Document;
-            var docName = doc.FileName;
-            if (!CheckForFileName(docName)) { return; }
-            Log.Warning($"Скачивание документа настроек {docName} в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
-            if (FileOperations.ReadId(chatsFile).Contains(message.Chat.Id.ToString()) 
-                && FileOperations.ReadId(accessFile).Contains(message.From.Id.ToString()))
-            {
-                var file = await bot.GetFileAsync(doc.FileId);
-                var fileName = AppDomain.CurrentDomain.BaseDirectory + docName;
-                using var stream = new FileStream(fileName, FileMode.Create);
-                await bot.DownloadFileAsync(file.FilePath, stream, cToken);
-            }
-            else
-            {
-                Log.Error($"Несанкционированный доступ к перезаписи настроек бота!!!");
-                await bot.SendTextMessageAsync(message.Chat.Id, 
-                    $"У вас нет прав для данной операции! Товарищ @{message.From.Username}! Эй, @MrSega13, тут кто-то балуется 😡",
-                    replyToMessageId: message.MessageId);
-            }
+            Log.Error(ex, "Ошибка в HandleUpdateAsync");
+            await bot.SendTextMessageAsync(update?.Message?.Chat, "Произошла ошибка при отправлении ответного сообщения!" +
+                "Проверьте правильность своего сообщения. Если ошибка не исправляется, то пожалуйста, сообщите о ней. 😰");
         }
     }
     private async Task CheckMessageForKeywords(ITelegramBotClient bot, long chatId, Chat chat, string text, int id, string? author, MessageProcess messageProcess, CancellationToken cToken)
     {
-        switch (text.ToLower()) //TODO: Вынести админские методы в отдельный if блок?
+        switch (text.ToLower())
         {
             case string a when a.Contains("оффтоп"): { break; }
             case string b when b.Contains("delete"):
