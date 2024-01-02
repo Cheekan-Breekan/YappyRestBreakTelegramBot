@@ -5,7 +5,7 @@ namespace TelegramBot
 {
     internal class Program
     {
-        static void Main()
+        static async Task Main()
         {
             var builder = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true);
             var config = builder.Build();
@@ -16,7 +16,15 @@ namespace TelegramBot
 
             var telegramUI = new TelegramUI(config);
             telegramUI.StartBot();
-            Console.ReadLine();
+
+            var input = string.Empty;
+            while (input?.ToLower() != "quitbot")
+            {
+                Console.WriteLine("Для завершения работы приложения введите слово: quitbot");
+                input = Console.ReadLine();
+            }
+            Log.Warning("Бот деактивирован! Приложение завершило свою работу!");
+            Console.WriteLine("Бот деактивирован! Приложение завершило свою работу!");
         }
     }
 }

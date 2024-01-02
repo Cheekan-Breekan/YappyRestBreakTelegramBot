@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System.Globalization;
+using TelegramBot.Models;
 
 namespace TelegramBot
 {
@@ -89,9 +90,20 @@ namespace TelegramBot
                     Log.Debug(ex.ToString());
                     IsErrorDetected = true;
                     if (date == default)
-                        ErrorMessage += $"Присутствует грамматически неправильный перерыв {(line.Length > 30 ? "с неизвестным временем" : $"({line})")}! {ex.Message} {EndOfErrorMessage}";
+                    {
+                        ErrorMessage += $"Грамматически неправильный перерыв " +
+                            $"{(line.Length > 30 ? "с неизвестным временем" : $"({line})")}! {ex.Message} {EndOfErrorMessage}";
+                    }
+                    else if (time == default)
+                    {
+                        ErrorMessage += $"Грамматически неправильный перерыв " +
+                            $"{(line.Length > 30 ? "с неизвестным временем" : $"({line})")}! Неправильно указана длительность перерыва. {EndOfErrorMessage}";
+                    }
                     else
-                        ErrorMessage += $"Грамматически неправильный перерыв {(line.Length > 30 ? $"в {date:HH:mm}" : $"({line})")}! {ex.Message} {EndOfErrorMessage}";
+                    {
+                        ErrorMessage += $"Грамматически неправильный перерыв {(line.Length > 30 ? $"в {date:HH:mm}" : $"({line})")}!" +
+                            $" {ex.Message} {EndOfErrorMessage}";
+                    }
                     lines.Remove(line);
                     continue;
                 }
@@ -147,7 +159,7 @@ namespace TelegramBot
                 IsErrorDetected = true;
                 ErrorMessage += $"В {date:HH:mm} уже проставлен идентичный перерыв! Не дублируйте! Правильные перерывы записаны.{Environment.NewLine}{Environment.NewLine}";
                 return false;
-            } 
+            }
             return true;
         }
         private bool CheckForRightDinnerTime(DateTime date, int time)
@@ -249,12 +261,19 @@ namespace TelegramBot
         }
         private DateTime ConvertToDate(string time)
         {
-            var date = DateTime.ParseExact(time, "H:m", CultureInfo.CurrentCulture);
-            if (date < DateTime.Now)
-                date += TimeSpan.FromHours(24);
-            if (date - DateTime.Now >= TimeSpan.FromHours(18))
-                throw new Exception($"Перерыв стоит слишком далеко по времени, более чем через 18 часов.");
-            return date;
+            if (DateTime.TryParseExact(time, "H:m", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime date))
+            {
+                if (date < DateTime.Now)
+                    date += TimeSpan.FromHours(24);
+                if (date - DateTime.Now >= TimeSpan.FromHours(18))
+                    throw new Exception($"Перерыв стоит слишком далеко по времени, более чем через 18 часов.");
+                return date;
+            }
+            else
+            {
+                throw new Exception($"Не удалось преобразовать {(time.Length > 50 ? "строку" : $"\"{time}\"")} в формат времени," +
+                    $" проверьте правильность ввода сообщения.");
+            }
         }
     }
 }

@@ -9,7 +9,6 @@ namespace TelegramBot;
 public class TelegramUI
 {
     //const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //основной (бывший яппи)
-    //const string token = "5836576057:AAHhYfo9sBbEiD2WQE5SuBZV7O2vsZcLZK8"; //цифромед
     private const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
     private readonly IConfiguration _config;
     private readonly ITelegramBotClient _telegramBot = new TelegramBotClient(token);
@@ -51,7 +50,7 @@ public class TelegramUI
                 }
                 await CheckMessageForKeywords(bot, chatId, chat, text, id, author, messageProcess, cToken);
             }
-            else if (update?.Message?.Document is not null)
+            else if (update.Type == UpdateType.Message && update?.Message?.Document is not null)
             {
                 var message = update.Message;
                 var doc = message.Document;
@@ -80,7 +79,7 @@ public class TelegramUI
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Ошибка в HandleUpdateAsync");
+            Log.Error(ex, $"Ошибка в {nameof(HandleUpdateAsync)}");
             await bot.SendTextMessageAsync(update?.Message?.Chat, "Произошла ошибка при отправлении ответного сообщения!" +
                 "Проверьте правильность своего сообщения. Если ошибка не исправляется, то пожалуйста, сообщите о ней. 😰");
         }
@@ -255,19 +254,29 @@ public class TelegramUI
     private static Task HandleErrorsAsync(ITelegramBotClient bot, Exception ex, CancellationToken cancellationToken)
     {
         Log.Fatal(ex, "Ошибка! Фатальная ошибка приложения!!!");
+        var error = ex switch
+        {
+            Telegram.Bot.Exceptions.ApiRequestException apiRequestException
+                => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
+            _ => ex.ToString()
+        };
         return Task.CompletedTask;
     }
     public void StartBot()
     {
-        Log.Warning("Бот запущен: " + _telegramBot.GetMeAsync().Result.FirstName);
         LoadSavedChatsId();
         var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
         var receiverOptions = new ReceiverOptions()
         {
-            AllowedUpdates = { }
+            AllowedUpdates = new[]
+            {
+                UpdateType.Message,
+            },
+            ThrowPendingUpdates = false,
         };
         _telegramBot.StartReceiving(HandleUpdateAsync, HandleErrorsAsync, receiverOptions, cancellationToken);
+        Log.Warning("Бот запущен: " + _telegramBot.GetMeAsync().Result.FirstName);
     }
     private void LoadSavedChatsId()
     {

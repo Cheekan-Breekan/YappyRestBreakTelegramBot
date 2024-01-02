@@ -1,4 +1,4 @@
-﻿namespace TelegramBot
+﻿namespace TelegramBot.Models
 {
     public class UserMessageLine
     {
