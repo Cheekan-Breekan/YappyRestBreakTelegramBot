@@ -4,6 +4,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Extensions.Polling;
 using Microsoft.Extensions.Configuration;
 using System.Text.RegularExpressions;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace TelegramBot;
 public class TelegramUI
@@ -12,8 +13,8 @@ public class TelegramUI
     private const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
     private readonly IConfiguration _config;
     private readonly ITelegramBotClient _telegramBot = new TelegramBotClient(token);
-    private const string accessFile = "access";
-    private const string chatsFile = "chats";
+    //private const string accessFile = "access";
+    //private const string chatsFile = "chats";
 
     private Dictionary<long, MessageProcess> chats;
     public TelegramUI(IConfiguration config)
@@ -57,8 +58,8 @@ public class TelegramUI
                 var docName = doc.FileName;
                 if (!CheckForFileName(docName)) { return; }
                 Log.Warning($"Скачивание документа настроек {docName} в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
-                if (FileOperations.ReadId(chatsFile).Contains(message.Chat.Id.ToString())
-                    && FileOperations.ReadId(accessFile).Contains(message.From.Id.ToString()))
+                if (FileOperations.ReadId(FileOperations.chatsFileName).Contains(message.Chat.Id.ToString())
+                    && FileOperations.ReadId(FileOperations.accessFileName).Contains(message.From.Id.ToString()))
                 {
                     var file = await bot.GetFileAsync(doc.FileId);
                     var fileName = AppDomain.CurrentDomain.BaseDirectory + docName;
@@ -95,20 +96,21 @@ public class TelegramUI
                     await SendAnswer(bot, chat, id, messageProcess);
                     break;
                 }
-            case string c when c.Contains("help"):
+            case string c when (c == "help" || c == "помощь"):
                 {
                     var helpMessage = PrepareHelpMessage(chatId);
-                    await bot.SendTextMessageAsync(chat, helpMessage, replyToMessageId: id, cancellationToken: cToken);
+                    var markup = CreateReplyKeyboard();
+                    await bot.SendTextMessageAsync(chat, helpMessage, replyToMessageId: id, cancellationToken: cToken, replyMarkup: markup);
                     break;
                 }
-            case string d when d.Contains("список"):
+            case string d when d == "список":
                 {
                     await SendAnswer(bot, chat, id, messageProcess);
                     break;
                 }
-            case string e when e.Contains("reset"):
+            case string e when (e == "reset" || e == "очистить"):
                 {
-                    if (FileOperations.ReadId(accessFile).Contains(author))
+                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
                     {
                         messageProcess.ClearList();
                         await bot.SendTextMessageAsync(chat, "Список перерывов полностью очищен!", replyToMessageId: id, cancellationToken: cToken);
@@ -118,7 +120,7 @@ public class TelegramUI
                 }
             case string f when f.Contains("insert"):
                 {
-                    if (FileOperations.ReadId(accessFile).Contains(author))
+                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
                     {
                         messageProcess.StartProcessing(text, isToInsert: true);
                         await SendAnswer(bot, chat, id, messageProcess);
@@ -127,7 +129,7 @@ public class TelegramUI
                 }
             case string g when g.Contains("applylimits"):
                 {
-                    if (FileOperations.ReadId(accessFile).Contains(author))
+                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
                     {
                         messageProcess.ApplyLimits();
                         await bot.SendTextMessageAsync(chatId, $"Новые лимиты применены.{Environment.NewLine}{PrepareRulesMessage(chatId)}", cancellationToken: cToken);
@@ -137,7 +139,7 @@ public class TelegramUI
                 }
             case string h when h.Contains("download"):
                 {
-                    if (FileOperations.ReadId(accessFile).Contains(author))
+                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
                     {
                         var fileName = string.Concat(text.Skip(9)) + ".json";
                         using Stream stream = System.IO.File.OpenRead(fileName);
@@ -149,7 +151,7 @@ public class TelegramUI
                 }
             case string j when j.Contains("restorebackup"):
                 {
-                    if (FileOperations.ReadId(accessFile).Contains(author))
+                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
                     {
                         FileOperations.RestoreDefault();
                         await bot.SendTextMessageAsync(chatId,
@@ -161,7 +163,7 @@ public class TelegramUI
                 }
             case string k when k.Contains("applyids"):
                 {
-                    if (FileOperations.ReadId(accessFile).Contains(author))
+                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
                     {
                         LoadSavedChatsId();
                         await bot.SendTextMessageAsync(chatId,
@@ -179,15 +181,25 @@ public class TelegramUI
                 }
         }
     }
+    private ReplyKeyboardMarkup CreateReplyKeyboard()
+    {
+        return new(new[]
+        {
+            new KeyboardButton[] {"Помощь", "Список"},
+            new KeyboardButton[] {"Всё ниже для админов!"},
+            new KeyboardButton[] {"Инструкция", "Очистить"},
+            new KeyboardButton[] {},
+        });
+    }
     private bool CheckForFileName(string fileName)
     {
         var list = new List<string>()
         {
-            $"{chatsFile}.json",
-            $"{accessFile}.json",
-            "appsettings.json"
+            FileOperations.chatsFileName,
+            FileOperations.accessFileName,
+            FileOperations.settingsFileName
         };
-        if (list.Any(s => s.Contains(fileName)))
+        if (list.Any(s => s == fileName))
             return true;
         return false;
     }
@@ -283,7 +295,7 @@ public class TelegramUI
         try
         {
             chats = new();
-            foreach (var line in FileOperations.ReadId(chatsFile))
+            foreach (var line in FileOperations.ReadId(FileOperations.chatsFileName))
             {
                 if (long.TryParse(line, out var id))
                 {

@@ -1,12 +1,15 @@
 ﻿namespace TelegramBot;
 public static class FileOperations
 {
+	public const string chatsFileName = "chats.json";
+    public const string accessFileName = "access.json";
+    public const string settingsFileName = "appsettings.json";
     public static List<string> ReadId(string fileName)
     {
         var list = new List<string>();
 		try
 		{
-			list.AddRange(File.ReadAllLines($"{AppDomain.CurrentDomain.BaseDirectory}{Path.DirectorySeparatorChar}{fileName}.json").ToList());
+			list.AddRange(File.ReadAllLines($"{AppDomain.CurrentDomain.BaseDirectory}{Path.DirectorySeparatorChar}{fileName}").ToList());
 		}
 		catch (Exception ex)
 		{
@@ -18,8 +21,8 @@ public static class FileOperations
 	{
 		var appPath = AppDomain.CurrentDomain.BaseDirectory + Path.DirectorySeparatorChar;
 		var backup = appPath + "backup" + Path.DirectorySeparatorChar;
-		File.Copy(backup + "appsettings.json", appPath + "appsettings.json", true);
-		File.Copy(backup + "chats.json", appPath + "chats.json", true);
-        File.Copy(backup + "access.json", appPath + "access.json", true);
+		File.Copy(backup + settingsFileName, appPath + settingsFileName, true);
+		File.Copy(backup + chatsFileName, appPath + chatsFileName, true);
+        File.Copy(backup + accessFileName, appPath + accessFileName, true);
     }
 }
