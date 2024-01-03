@@ -56,7 +56,7 @@ namespace TelegramBot
             if (InputedMessageLines.Count != 0)
                 ChecksAndInsertLines();
         }
-        public void ProcessInputData(string messageText, bool isHasKeyword)
+        private void ProcessInputData(string messageText, bool isHasKeyword)
         {
             if (isHasKeyword)
             {
@@ -110,7 +110,7 @@ namespace TelegramBot
                 InputedMessageLines.Add(new UserMessageLine(date, name, time));
             }
         }
-        public void ChecksAndInsertLines()
+        private void ChecksAndInsertLines()
         {
             DeleteOldDates();
             foreach (var lineToInsert in InputedMessageLines)
@@ -225,7 +225,7 @@ namespace TelegramBot
             }
             return fullMessage;
         }
-        public void DeleteLines()
+        private void DeleteLines()
         {
             DeleteOldDates();
             foreach (var lineToDelete in InputedMessageLines.ToList())

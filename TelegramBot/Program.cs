@@ -5,7 +5,7 @@ namespace TelegramBot
 {
     internal class Program
     {
-        static async Task Main()
+        static void Main()
         {
             var builder = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true);
             var config = builder.Build();
