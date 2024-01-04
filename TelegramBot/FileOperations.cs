@@ -31,7 +31,11 @@ public static class FileOperations
         fileNameAccess,
         fileNameSettings
     };
-	public static bool FileContainsValue(string value, string fileName = fileNameAccess) => ReadId(fileName).Contains(value);
+	public static bool FileContainsValue(string value, string fileName = fileNameAccess)
+	{
+		if (value is null || fileName is null) { return false; }
+		return ReadId(fileName).Contains(value);
+	}
     public static bool CheckForFileName(string fileName) => CreateFileNamesArray().Any(s => s == fileName);
 	public static List<string> LoadChatIds() => ReadId(fileNameChats);
 }

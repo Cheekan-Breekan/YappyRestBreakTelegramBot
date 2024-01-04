@@ -75,7 +75,7 @@ namespace TelegramBot
                 if (string.IsNullOrWhiteSpace(line)) { continue; }
                 DateTime date = new DateTime();
                 int time = 0;
-                string name = string.Empty;
+                string name;
                 var splittedLine = line.Trim().Split(' ');
                 try
                 {

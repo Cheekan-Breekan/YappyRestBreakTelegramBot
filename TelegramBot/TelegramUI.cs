@@ -89,7 +89,7 @@ public class TelegramUI
                 "Проверьте правильность своего сообщения. Если ошибка не исправляется, то пожалуйста, сообщите о ней. 😰");
         }
     }
-    private async Task CheckMessageForKeywords(ITelegramBotClient bot, long chatId, Chat chat, string text, int id, string? author, MessageProcess messageProcess, CancellationToken cToken)
+    private async Task CheckMessageForKeywords(ITelegramBotClient bot, long chatId, Chat chat, string text, int id, string author, MessageProcess messageProcess, CancellationToken cToken)
     {
         switch (text.ToLower())
         {
@@ -287,7 +287,7 @@ public class TelegramUI
     private static Task HandleErrorsAsync(ITelegramBotClient bot, Exception ex, CancellationToken cancellationToken)
     {
         Log.Fatal(ex, "Ошибка! Фатальная ошибка приложения!!!");
-        var error = ex switch
+        _ = ex switch
         {
             Telegram.Bot.Exceptions.ApiRequestException apiRequestException
                 => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
