@@ -56,17 +56,14 @@ public class TelegramUI
                 var doc = message.Document;
                 var docName = doc.FileName;
 
-                if (!CheckForFileName(docName)) 
+                if (!FileOperations.CheckForFileName(docName))
                 {
-                    await bot.SendTextMessageAsync(message.Chat.Id,
-                            $"Неизвестные файлы. Операция отказана!",
-                            cancellationToken: cToken);
-                    return; 
+                    return;
                 }
 
                 Log.Warning($"Скачивание документа настроек {docName} в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
-                if (FileOperations.ReadId(FileOperations.chatsFileName).Contains(message.Chat.Id.ToString())
-                    && FileOperations.ReadId(FileOperations.accessFileName).Contains(message.From.Id.ToString()))
+                if (FileOperations.FileContainsValue(message.Chat.Id.ToString(), FileOperations.fileNameChats)
+                    && FileOperations.FileContainsValue(message.From.Id.ToString()))
                 {
                     var file = await bot.GetFileAsync(doc.FileId);
                     var fileName = AppDomain.CurrentDomain.BaseDirectory + docName;
@@ -117,7 +114,7 @@ public class TelegramUI
                 }
             case string e when (e == "очистить"):
                 {
-                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
+                    if (FileOperations.FileContainsValue(author))
                     {
                         messageProcess.ClearList();
                         await bot.SendTextMessageAsync(chat, "Список перерывов полностью очищен!", replyToMessageId: id, cancellationToken: cToken);
@@ -127,7 +124,7 @@ public class TelegramUI
                 }
             case string f when f.Contains("вставить"):
                 {
-                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
+                    if (FileOperations.FileContainsValue(author))
                     {
                         messageProcess.StartProcessing(text, isToInsert: true);
                         await SendAnswer(bot, chat, id, messageProcess);
@@ -136,7 +133,7 @@ public class TelegramUI
                 }
             case string g when g == "применить":
                 {
-                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
+                    if (FileOperations.FileContainsValue(author))
                     {
                         Log.Warning("Начало применения новых лимитов и добавления новых людей в whitelist доступа к боту.");
                         messageProcess.ApplyLimits();
@@ -151,9 +148,9 @@ public class TelegramUI
                 }
             case string h when h == "скачать":
                 {
-                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
+                    if (FileOperations.FileContainsValue(author))
                     {
-                        foreach (var fileName in CreateFileNamesArray())
+                        foreach (var fileName in FileOperations.CreateFileNamesArray())
                         {
                             using Stream stream = System.IO.File.OpenRead(fileName);
                             var iof = new Telegram.Bot.Types.InputFiles.InputOnlineFile(stream, fileName);
@@ -165,7 +162,7 @@ public class TelegramUI
                 }
             case string j when j == "восстановить":
                 {
-                    if (FileOperations.ReadId(FileOperations.accessFileName).Contains(author))
+                    if (FileOperations.FileContainsValue(author))
                     {
                         FileOperations.RestoreDefault();
                         await bot.SendTextMessageAsync(chatId,
@@ -178,9 +175,12 @@ public class TelegramUI
             case string k when k == "всё ниже для админов!": { break; }
             case string l when l == "инструкция":
                 {
-                    var guideMessage = PrepareGuideMessage();
-                    var markup = CreateReplyKeyboard();
-                    await bot.SendTextMessageAsync(chat, guideMessage, replyToMessageId: id, cancellationToken: cToken, replyMarkup: markup);
+                    if (FileOperations.FileContainsValue(author))
+                    {
+                        var guideMessage = PrepareGuideMessage();
+                        var markup = CreateReplyKeyboard();
+                        await bot.SendTextMessageAsync(chat, guideMessage, replyToMessageId: id, cancellationToken: cToken, replyMarkup: markup);
+                    }
                     break;
                 }
             default:
@@ -202,18 +202,6 @@ public class TelegramUI
             new KeyboardButton[] {"Восстановить"},
         });
     }
-    private bool CheckForFileName(string fileName)
-    {
-        if (CreateFileNamesArray().Any(s => s == fileName))
-            return true;
-        return false;
-    }
-    private string[] CreateFileNamesArray() => new string[]
-    {
-        FileOperations.chatsFileName,
-        FileOperations.accessFileName,
-        FileOperations.settingsFileName
-    };
     private string PrepareHelpMessage(long chatId)
     {
         var rules = PrepareRulesMessage(chatId);
@@ -251,12 +239,12 @@ public class TelegramUI
             $"Команда <<восстановить>> полностью обнуляет все настройки бота для всех чатов. " +
             $"Полезно при повреждении любого из файлов настроек и невозможности его восстановить вручную.{Environment.NewLine}{Environment.NewLine}" +
             $"Настройки деляться на три типа:{Environment.NewLine}" +
-            $"1) Настройка чатов, где бот может работать (лс и группы), название файла - chats.json. " +
+            $"1) Настройка чатов, где бот может работать (лс и группы), название файла - {FileOperations.fileNameChats}. " +
             $"Здесь построчно находятся ID чатов. Добавление происходит простым копированием ID чата в отдельную строку(!!!), никакие лишние символы недопустимы! " +
             $"Удаление происходит простым удалением строки с ID чата. Добавление ID группы отличается от ID человека тем, что после копирования в файл нужно добавить в ID число 100 после минуса, " +
             $"например: ID чата перерывов Ритма в web-телеграме -1652853848, а в файле нужно будет -1001652853848.{Environment.NewLine}" +
-            $"2) Настройка админов бота (только ID людей), название файла - access.json. Логика та же, что и в пункте 1, только без групповых чатов.{Environment.NewLine}" +
-            $"3) Настройка лимитов перерывов/обедов для чата, название файла - appsettings.json. В названии каждой секции присутствует ID чата, для которого определены лимиты ниже. " +
+            $"2) Настройка админов бота (только ID людей), название файла - {FileOperations.fileNameAccess}. Логика та же, что и в пункте 1, только без групповых чатов.{Environment.NewLine}" +
+            $"3) Настройка лимитов перерывов/обедов для чата, название файла - {FileOperations.fileNameSettings}. В названии каждой секции присутствует ID чата, для которого определены лимиты ниже. " +
             $"Сначала идут обеды: день (12-16), ночь(22-6), между ними(6-12, 16-22). Далее также десятиминутки. " +
             $"Для изменения лимита нужно просто поменять число у нужной строки. Для добавления нового чата нужно просто скопировать и вставить одну из уже существующих секций, " +
             $"изменить ID в названии секции, изменить лимиты.{Environment.NewLine}{Environment.NewLine}" +
@@ -328,7 +316,7 @@ public class TelegramUI
         try
         {
             chats = new();
-            foreach (var line in FileOperations.ReadId(FileOperations.chatsFileName))
+            foreach (var line in FileOperations.LoadChatIds())
             {
                 if (long.TryParse(line, out var id))
                 {

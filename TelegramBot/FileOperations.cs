@@ -1,10 +1,10 @@
 ﻿namespace TelegramBot;
 public static class FileOperations
 {
-	public const string chatsFileName = "chats.json";
-    public const string accessFileName = "access.json";
-    public const string settingsFileName = "appsettings.json";
-    public static List<string> ReadId(string fileName)
+	public const string fileNameChats = "chats.json";
+    public const string fileNameAccess = "access.json";
+    public const string fileNameSettings = "appsettings.json";
+    private static List<string> ReadId(string fileName)
     {
         var list = new List<string>();
 		try
@@ -21,8 +21,17 @@ public static class FileOperations
 	{
 		var appPath = AppDomain.CurrentDomain.BaseDirectory + Path.DirectorySeparatorChar;
 		var backup = appPath + "backup" + Path.DirectorySeparatorChar;
-		File.Copy(backup + settingsFileName, appPath + settingsFileName, true);
-		File.Copy(backup + chatsFileName, appPath + chatsFileName, true);
-        File.Copy(backup + accessFileName, appPath + accessFileName, true);
+		File.Copy(backup + fileNameSettings, appPath + fileNameSettings, true);
+		File.Copy(backup + fileNameChats, appPath + fileNameChats, true);
+        File.Copy(backup + fileNameAccess, appPath + fileNameAccess, true);
     }
+	public static string[] CreateFileNamesArray() => new string[]
+    {
+        fileNameChats,
+        fileNameAccess,
+        fileNameSettings
+    };
+	public static bool FileContainsValue(string value, string fileName = fileNameAccess) => ReadId(fileName).Contains(value);
+    public static bool CheckForFileName(string fileName) => CreateFileNamesArray().Any(s => s == fileName);
+	public static List<string> LoadChatIds() => ReadId(fileNameChats);
 }
