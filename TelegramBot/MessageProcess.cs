@@ -218,11 +218,12 @@ namespace TelegramBot
                 return ErrorMessage += "Используйте команду \"help\" для помощи и команду \"список\" для отображения актуального списка.";
             }
             DeleteOldDates();
-            string fullMessage = String.Empty;
+            string fullMessage = string.Empty;
             foreach (var line in MessageLines)
             {
                 fullMessage += line + Environment.NewLine;
             }
+            fullMessage = string.IsNullOrWhiteSpace(fullMessage) ? "Список перерывов пуст." : fullMessage;
             return fullMessage;
         }
         private void DeleteLines()

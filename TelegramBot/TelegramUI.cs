@@ -9,10 +9,10 @@ using Telegram.Bot.Types.ReplyMarkups;
 namespace TelegramBot;
 public class TelegramUI
 {
-    //private const string token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //основной (бывший яппи)
-    private const string token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
+    //private const string _token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //основной (бывший яппи)
+    private const string _token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
     private readonly IConfiguration _config;
-    private readonly ITelegramBotClient _telegramBot = new TelegramBotClient(token);
+    private readonly ITelegramBotClient _telegramBot = new TelegramBotClient(_token);
 
     private Dictionary<long, MessageProcess> chats;
     public TelegramUI(IConfiguration config)
@@ -249,7 +249,7 @@ public class TelegramUI
             $"Для изменения лимита нужно просто поменять число у нужной строки. Для добавления нового чата нужно просто скопировать и вставить одну из уже существующих секций, " +
             $"изменить ID в названии секции, изменить лимиты.{Environment.NewLine}{Environment.NewLine}" +
             $"Команда <<скачать>> позволяет скачать файлы настроек к себе для их редактирования. Данную команду лучше применять в лс для сохранения приватности настроек. " +
-            $"После редактирования необходимо просто перекинуть нужный файл(-ы) обратно боту, он его(их) скачает, установит и выдаст ответ об успехе или неуспехе операции. " +
+            $"После редактирования необходимо просто перекинуть нужный файл(-ы) обратно боту, он его(их) скачает, установит и обязательно выдаст ответ об успехе операции. " +
             $"Данную команду лучше применять в лс для сохранения приватности настроек, хоть и устанавливать настройки могут лишь лица с админ.доступом.{Environment.NewLine}" +
             $"Команда <<применить>> позволяет привести в действие новые настройки. Внимание, без этой команды бот будет работать по старым настройкам! " +
             $"Применяется только в групповом чате, где нужно применить настройки! Применение в одном чате не обновляет настройки в любом другом, это нужно помнить!";
