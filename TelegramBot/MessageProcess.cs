@@ -60,8 +60,10 @@ namespace TelegramBot
         {
             if (isHasKeyword)
             {
-                messageText = messageText.Replace("delete", string.Empty);
-                messageText = messageText.Replace("insert", string.Empty);
+                messageText = messageText.Replace("delete", string.Empty, StringComparison.CurrentCultureIgnoreCase);
+                messageText = messageText.Replace("insert", string.Empty, StringComparison.CurrentCultureIgnoreCase);
+                messageText = messageText.Replace("удалить", string.Empty, StringComparison.CurrentCultureIgnoreCase);
+                messageText = messageText.Replace("вставить", string.Empty, StringComparison.CurrentCultureIgnoreCase);
             }
             var lines = messageText.Trim().Split($"\n").ToList();
             if (lines.Count > 7 && !isHasKeyword)
