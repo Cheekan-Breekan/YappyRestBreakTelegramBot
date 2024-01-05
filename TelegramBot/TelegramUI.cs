@@ -37,7 +37,7 @@ public class TelegramUI
                 if (!chats.ContainsKey(chatId))
                 {
                     await bot.SendTextMessageAsync(chat, "Нет прав писать этому боту.", cancellationToken: cToken);
-                    Log.Warning("Нет прав писать этому боту.");
+                    Log.Warning($"Нет прав писать этому боту в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
                     return;
                 }
                 var messageProcess = chats[chatId];
