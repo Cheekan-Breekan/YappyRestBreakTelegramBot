@@ -5,15 +5,12 @@ using Telegram.Bot.Extensions.Polling;
 using Microsoft.Extensions.Configuration;
 using System.Text.RegularExpressions;
 using Telegram.Bot.Types.ReplyMarkups;
+using Newtonsoft.Json.Linq;
 
 namespace TelegramBot;
 public class TelegramUI
 {
-    //private const string _token = "5605211357:AAFR7Ys8a5Ey6Sy5jL_tyS3S2iQKQVaw1tI"; //основной (бывший яппи)
-    private const string _token = "5620311832:AAGVmmVQE0rkz7NNfI28HKfo97ZLy2u3Arc"; //тестовый
     private readonly IConfiguration _config;
-    private readonly ITelegramBotClient _telegramBot = new TelegramBotClient(_token);
-
     private Dictionary<long, MessageProcess> chats;
     public TelegramUI(IConfiguration config)
     {
@@ -297,6 +294,9 @@ public class TelegramUI
     }
     public void StartBot()
     {
+        var id = _config["telegramIdTest"];
+        var telegramBot = new TelegramBotClient(id);
+
         LoadSavedChatsId();
         var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
@@ -308,8 +308,8 @@ public class TelegramUI
             },
             ThrowPendingUpdates = false,
         };
-        _telegramBot.StartReceiving(HandleUpdateAsync, HandleErrorsAsync, receiverOptions, cancellationToken);
-        Log.Warning("Бот запущен: " + _telegramBot.GetMeAsync().Result.FirstName);
+        telegramBot.StartReceiving(HandleUpdateAsync, HandleErrorsAsync, receiverOptions, cancellationToken);
+        Log.Warning("Бот запущен: " + telegramBot.GetMeAsync().Result.FirstName);
     }
     private void LoadSavedChatsId()
     {

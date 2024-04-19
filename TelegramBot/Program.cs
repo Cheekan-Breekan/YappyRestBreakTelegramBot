@@ -7,7 +7,10 @@ namespace TelegramBot
     {
         static void Main()
         {
-            var builder = new ConfigurationBuilder().AddJsonFile("appsettings.json", false, true);
+            var builder = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", false, true)
+                .AddJsonFile("telegram.json", false, true);
+
             var config = builder.Build();
 
             Log.Logger = new LoggerConfiguration().MinimumLevel.Debug()
