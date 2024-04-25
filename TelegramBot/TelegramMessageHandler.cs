@@ -1,100 +1,98 @@
-﻿using Telegram.Bot;
-using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types;
-using Telegram.Bot.Extensions.Polling;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using System.Text.RegularExpressions;
+using Telegram.Bot;
+using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
-using Newtonsoft.Json.Linq;
 
 namespace TelegramBot;
-public class TelegramUI
+public class TelegramMessageHandler(IConfiguration config, ITelegramBotClient bot, Update update, Dictionary<long, BreaksHandler> chats, CancellationToken cToken)
 {
-    private readonly IConfiguration _config;
-    private Dictionary<long, MessageProcess> chats;
-    public TelegramUI(IConfiguration config)
+    private static bool isAdmin = false;
+    public async Task StartMessageHandleAsync()
     {
-        _config = config;
-    }
-    private async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cToken)
-    {
-        try
+        if (update.Type == UpdateType.Message && update?.Message?.Text != null)
         {
-            if (update.Type == UpdateType.Message && update?.Message?.Text != null)
-            {
-                var message = update.Message;
-                var chatId = message.Chat.Id;
-                var chat = message.Chat;
-                var text = message.Text;
-                var id = message.MessageId;
-                var author = message.From.Id.ToString();
-                var authorName = message.From.Username;
+            var message = update.Message;
+            var chatId = message.Chat.Id;
+            var chat = message.Chat;
+            var text = message.Text;
+            var id = message.MessageId;
+            var author = message.From.Id.ToString();
+            var authorName = message.From.Username;
 
-                Log.Information($"В чате: {chat.Username} ({chatId}) от {authorName} ({author}) сообщение: {text}");
-                if (!chats.ContainsKey(chatId))
-                {
-                    await bot.SendTextMessageAsync(chat, "Нет прав писать этому боту.", cancellationToken: cToken);
-                    Log.Warning($"Нет прав писать этому боту в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
-                    return;
-                }
-                var messageProcess = chats[chatId];
-                if (text.ToLower().Contains("fromchatid"))
-                {
-                    var splitText = text.Split("\n");
-                    var desiredChat = string.Concat(splitText[0].Skip(11));
-                    messageProcess = chats[long.Parse(desiredChat)];
-                    text = string.Join("\n", splitText.Skip(1));
-                }
-                await CheckMessageForKeywords(bot, chatId, chat, text, id, author, messageProcess, cToken);
+            Log.Information($"В чате: {chat.Username} ({chatId}) от {authorName} ({author}) сообщение: {text}");
+            if (!CheckForWhitelistChat(chatId))
+            {
+                await bot.SendTextMessageAsync(chat, "Нет прав писать этому боту.", cancellationToken: cToken);
+                Log.Warning($"Нет прав писать этому боту в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
+                return;
             }
-            else if (update.Type == UpdateType.Message && update?.Message?.Document is not null)
+
+            if (!chats.TryGetValue(chatId, out var breaksHandler))
             {
-                var message = update.Message;
-                var doc = message.Document;
-                var docName = doc.FileName;
+                breaksHandler = new BreaksHandler(chatId.ToString(), config);
+                chats.Add(chatId, breaksHandler);
+            }
 
-                if (!FileOperations.CheckForFileName(docName))
-                {
-                    return;
-                }
+            if (FileOperations.FileContainsValue(author, true))
+            {
+                isAdmin = true;
+            }
 
-                Log.Warning($"Скачивание документа настроек {docName} в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
-                if (FileOperations.FileContainsValue(message.Chat.Id.ToString(), FileOperations.fileNameChats)
-                    && FileOperations.FileContainsValue(message.From.Id.ToString()))
-                {
-                    var file = await bot.GetFileAsync(doc.FileId);
-                    var fileName = AppDomain.CurrentDomain.BaseDirectory + docName;
-                    using var stream = new FileStream(fileName, FileMode.Create);
-                    await bot.DownloadFileAsync(file.FilePath, stream, cToken);
-                    await bot.SendTextMessageAsync(message.Chat.Id,
-                            $"Файл установлен. Для применения новых настроек напишите: применить.",
-                            cancellationToken: cToken);
-                }
-                else
-                {
-                    Log.Warning($"Несанкционированный доступ к перезаписи настроек бота!!!");
-                    await bot.SendTextMessageAsync(message.Chat.Id,
-                        $"У вас нет прав для данной операции! Товарищ @{message.From.Username}! Эй, тут кто-то балуется 😡",
-                        replyToMessageId: message.MessageId);
-                }
+            await CheckMessageForKeywords(bot, chatId, chat, text, id, breaksHandler, cToken);
+        }
+        else if (update.Type == UpdateType.Message && update?.Message?.Document is not null)
+        {
+            var message = update.Message;
+            var doc = message.Document;
+            var docName = doc.FileName;
+
+            if (!FileOperations.CheckForFileName(docName))
+            {
+                return;
+            }
+
+            Log.Warning($"Скачивание документа настроек {docName} в чате {message.Chat.Id}: {message.Chat.Username} от {message.From.Id}: {message.From.Username}");
+            if (FileOperations.FileContainsValue(message.Chat.Id.ToString(), false)
+                && FileOperations.FileContainsValue(message.From.Id.ToString(), true))
+            {
+                var file = await bot.GetFileAsync(doc.FileId);
+                var fileName = AppDomain.CurrentDomain.BaseDirectory + docName;
+                using var stream = new FileStream(fileName, FileMode.Create);
+                await bot.DownloadFileAsync(file.FilePath, stream, cToken);
+                await bot.SendTextMessageAsync(message.Chat.Id,
+                        $"Файл установлен.",
+                        cancellationToken: cToken);
+            }
+            else
+            {
+                Log.Warning($"Несанкционированный доступ к перезаписи настроек бота!!!");
+                await bot.SendTextMessageAsync(message.Chat.Id,
+                    $"У вас нет прав для данной операции! Товарищ @{message.From.Username}! Эй, тут кто-то балуется 😡",
+                    replyToMessageId: message.MessageId);
             }
         }
-        catch (Exception ex)
-        {
-            Log.Error(ex, $"Ошибка в {nameof(HandleUpdateAsync)}");
-            await bot.SendTextMessageAsync(update?.Message?.Chat, "Произошла ошибка при отправлении ответного сообщения!" +
-                "Проверьте правильность своего сообщения. Если ошибка не исправляется, то пожалуйста, сообщите о ней. 😰");
-        }
     }
-    private async Task CheckMessageForKeywords(ITelegramBotClient bot, long chatId, Chat chat, string text, int id, string author, MessageProcess messageProcess, CancellationToken cToken)
+
+    private static bool CheckForWhitelistChat(long chatId)
+    {
+        if (!FileOperations.FileContainsValue(chatId.ToString(), isAdminCheck: false))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    private async Task CheckMessageForKeywords(ITelegramBotClient bot, long chatId, Chat chat, string text, int id, BreaksHandler handler, CancellationToken cToken)
     {
         switch (text.ToLower())
         {
             case string a when a.Contains("оффтоп"): { break; }
             case string b when (b.Contains("delete") || b.Contains("удалить")):
                 {
-                    messageProcess.StartProcessing(text, true);
-                    await SendAnswer(bot, chat, id, messageProcess);
+                    handler.StartProcessing(text, true);
+                    await SendAnswer(bot, chat, id, handler);
                     break;
                 }
             case string c when (c == "help" || c == "помощь"):
@@ -106,14 +104,14 @@ public class TelegramUI
                 }
             case string d when d == "список":
                 {
-                    await SendAnswer(bot, chat, id, messageProcess);
+                    await SendAnswer(bot, chat, id, handler);
                     break;
                 }
             case string e when (e == "очистить"):
                 {
-                    if (FileOperations.FileContainsValue(author))
+                    if (isAdmin)
                     {
-                        messageProcess.ClearList();
+                        handler.ClearList();
                         await bot.SendTextMessageAsync(chat, "Список перерывов полностью очищен!", replyToMessageId: id, cancellationToken: cToken);
                         Log.Logger.Information("Список перерывов полностью очищен!", "BOT");
                     }
@@ -121,23 +119,21 @@ public class TelegramUI
                 }
             case string f when f.Contains("вставить"):
                 {
-                    if (FileOperations.FileContainsValue(author))
+                    if (isAdmin)
                     {
-                        messageProcess.StartProcessing(text, isToInsert: true);
-                        await SendAnswer(bot, chat, id, messageProcess);
+                        handler.StartProcessing(text, isToInsert: true);
+                        await SendAnswer(bot, chat, id, handler);
                     }
                     break;
                 }
             case string g when g == "применить":
                 {
-                    if (FileOperations.FileContainsValue(author))
+                    if (isAdmin)
                     {
-                        Log.Warning("Начало применения новых лимитов и добавления новых людей в whitelist доступа к боту.");
-                        messageProcess.ApplyLimits();
-                        LoadSavedChatsId();
-                        //await bot.SendTextMessageAsync(chatId, $"Новые лимиты применены.{Environment.NewLine}{PrepareRulesMessage(chatId)}", cancellationToken: cToken);
+                        Log.Warning("Начало применения новых лимитов.");
+                        handler.ApplyLimits();
                         await bot.SendTextMessageAsync(chatId,
-                            $"Новые значения настроек доступа к боту в применены.\nНовые лимиты перерывов применены только в данном чате!",
+                            $"Новые лимиты перерывов применены только в данном чате!",
                             cancellationToken: cToken);
                         Log.Warning("Окончание операции.");
                     }
@@ -145,7 +141,7 @@ public class TelegramUI
                 }
             case string h when h == "скачать":
                 {
-                    if (FileOperations.FileContainsValue(author))
+                    if (isAdmin)
                     {
                         foreach (var fileName in FileOperations.CreateFileNamesArray())
                         {
@@ -159,7 +155,7 @@ public class TelegramUI
                 }
             case string j when j == "восстановить":
                 {
-                    if (FileOperations.FileContainsValue(author))
+                    if (isAdmin)
                     {
                         FileOperations.RestoreDefault();
                         await bot.SendTextMessageAsync(chatId,
@@ -169,10 +165,9 @@ public class TelegramUI
                     }
                     break;
                 }
-            case string k when k == "всё ниже для админов!": { break; }
-            case string l when l == "инструкция":
+            case string l when l == "инструкция (админ)":
                 {
-                    if (FileOperations.FileContainsValue(author))
+                    if (isAdmin)
                     {
                         var guideMessage = PrepareGuideMessage();
                         var markup = CreateReplyKeyboard();
@@ -182,21 +177,18 @@ public class TelegramUI
                 }
             default:
                 {
-                    messageProcess.StartProcessing(text);
-                    await SendAnswer(bot, chat, id, messageProcess);
+                    handler.StartProcessing(text);
+                    await SendAnswer(bot, chat, id, handler);
                     break;
                 }
         }
     }
-    private ReplyKeyboardMarkup CreateReplyKeyboard()
+    private static ReplyKeyboardMarkup CreateReplyKeyboard()
     {
         return new(new[]
         {
             new KeyboardButton[] {"Помощь", "Список"},
-            new KeyboardButton[] {"Всё ниже для админов!"},
-            new KeyboardButton[] {"Инструкция", "Очистить"},
-            new KeyboardButton[] {"Скачать", "Применить"},
-            new KeyboardButton[] {"Восстановить"},
+            new KeyboardButton[] {"Инструкция (админ)"},
         });
     }
     private string PrepareHelpMessage(long chatId)
@@ -222,26 +214,26 @@ public class TelegramUI
     private string PrepareRulesMessage(long chatId)
     {
         return $"Количество перерывов в один промежуток времени для данного чата:{Environment.NewLine}" +
-                            $"Днем с 12 до 16 - {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitDay")} обедов и " +
-                            $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitDay")} десятиминуток, " +
-                            $"в остальное дневное время {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitBetween")} обедов и " +
-                            $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitBetween")} десятиминуток.{Environment.NewLine}" +
-                            $"Ночью - только {_config.GetValue<int>($"Limits:{chatId}:DinnersLimitNight")} обедов и " +
-                            $"{_config.GetValue<int>($"Limits:{chatId}:BreaksLimitNight")} десятиминуток.";
+                            $"Днем с 12 до 16 - {config.GetValue<int>($"Limits:{chatId}:DinnersLimitDay")} обедов и " +
+                            $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitDay")} десятиминуток, " +
+                            $"в остальное дневное время {config.GetValue<int>($"Limits:{chatId}:DinnersLimitBetween")} обедов и " +
+                            $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitBetween")} десятиминуток.{Environment.NewLine}" +
+                            $"Ночью - только {config.GetValue<int>($"Limits:{chatId}:DinnersLimitNight")} обедов и " +
+                            $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitNight")} десятиминуток.";
     }
-    private string PrepareGuideMessage()
+    private static string PrepareGuideMessage()
     {
         return $"Всё нижеперечисленное доступно лишь тем, чьё ID телеграма прописано в файле access.json.{Environment.NewLine}" +
             $"Команда <<очистить>> полностью обнуляет список перерывов, полезно в случае ввода большого количества неверных данных.{Environment.NewLine}" +
             $"Команда <<восстановить>> полностью обнуляет все настройки бота для всех чатов. " +
             $"Полезно при повреждении любого из файлов настроек и невозможности его восстановить вручную.{Environment.NewLine}{Environment.NewLine}" +
             $"Настройки деляться на три типа:{Environment.NewLine}" +
-            $"1) Настройка чатов, где бот может работать (лс и группы), название файла - {FileOperations.fileNameChats}. " +
+            $"1) Настройка чатов, где бот может работать (лс и группы), название файла - {FileOperations.FileNameChats}. " +
             $"Здесь построчно находятся ID чатов. Добавление происходит простым копированием ID чата в отдельную строку(!!!), никакие лишние символы недопустимы! " +
             $"Удаление происходит простым удалением строки с ID чата. Добавление ID группы отличается от ID человека тем, что после копирования в файл нужно добавить в ID число 100 после минуса, " +
             $"например: ID чата перерывов Ритма в web-телеграме -1652853848, а в файле нужно будет -1001652853848.{Environment.NewLine}" +
-            $"2) Настройка админов бота (только ID людей), название файла - {FileOperations.fileNameAccess}. Логика та же, что и в пункте 1, только без групповых чатов.{Environment.NewLine}" +
-            $"3) Настройка лимитов перерывов/обедов для чата, название файла - {FileOperations.fileNameSettings}. В названии каждой секции присутствует ID чата, для которого определены лимиты ниже. " +
+            $"2) Настройка админов бота (только ID людей), название файла - {FileOperations.FileNameAccess}. Логика та же, что и в пункте 1, только без групповых чатов.{Environment.NewLine}" +
+            $"3) Настройка лимитов перерывов/обедов для чата, название файла - {FileOperations.FileNameSettings}. В названии каждой секции присутствует ID чата, для которого определены лимиты ниже. " +
             $"Сначала идут обеды: день (12-16), ночь(22-6), между ними(6-12, 16-22). Далее также десятиминутки. " +
             $"Для изменения лимита нужно просто поменять число у нужной строки. Для добавления нового чата нужно просто скопировать и вставить одну из уже существующих секций, " +
             $"изменить ID в названии секции, изменить лимиты.{Environment.NewLine}{Environment.NewLine}" +
@@ -251,7 +243,7 @@ public class TelegramUI
             $"Команда <<применить>> позволяет привести в действие новые настройки. Внимание, без этой команды бот будет работать по старым настройкам! " +
             $"Применяется только в групповом чате, где нужно применить настройки! Применение в одном чате не обновляет настройки в любом другом, это нужно помнить!";
     }
-    private async Task SendAnswer(ITelegramBotClient bot, Chat chat, int id, MessageProcess messageProcess)
+    private static async Task SendAnswer(ITelegramBotClient bot, Chat chat, int id, BreaksHandler messageProcess)
     {
         var limit = 3800;
         var answer = messageProcess.GetFullMessage();
@@ -279,56 +271,6 @@ public class TelegramUI
         catch (Exception ex)
         {
             Log.Error(ex, "Ошибка! Не произошла отправка обратного сообщения!");
-        }
-    }
-    private static Task HandleErrorsAsync(ITelegramBotClient bot, Exception ex, CancellationToken cancellationToken)
-    {
-        Log.Fatal(ex, "Ошибка! Фатальная ошибка приложения!!!");
-        _ = ex switch
-        {
-            Telegram.Bot.Exceptions.ApiRequestException apiRequestException
-                => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
-            _ => ex.ToString()
-        };
-        return Task.CompletedTask;
-    }
-    public void StartBot()
-    {
-        var id = _config["telegramIdTest"];
-        var telegramBot = new TelegramBotClient(id);
-
-        LoadSavedChatsId();
-        var cts = new CancellationTokenSource();
-        var cancellationToken = cts.Token;
-        var receiverOptions = new ReceiverOptions()
-        {
-            AllowedUpdates = new[]
-            {
-                UpdateType.Message,
-            },
-            ThrowPendingUpdates = false,
-        };
-        telegramBot.StartReceiving(HandleUpdateAsync, HandleErrorsAsync, receiverOptions, cancellationToken);
-        Log.Warning("Бот запущен: " + telegramBot.GetMeAsync().Result.FirstName);
-    }
-    private void LoadSavedChatsId()
-    {
-        try
-        {
-            chats = new();
-            foreach (var line in FileOperations.LoadChatIds())
-            {
-                if (long.TryParse(line, out var id))
-                {
-                    chats.Add(id, new MessageProcess(line, _config));
-                    Log.Warning(id + " - айди чата загружен");
-                }
-                else { Log.Error(line + " - не удалось загрузить айди! Ошибка!"); }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Fatal($"Произошла непредвиденная ошибка при загрузке id чата {ex}");
         }
     }
 }

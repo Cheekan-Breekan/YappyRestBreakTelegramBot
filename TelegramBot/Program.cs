@@ -17,7 +17,7 @@ namespace TelegramBot
                 .WriteTo.Console(Serilog.Events.LogEventLevel.Warning).WriteTo.File($"Logs{Path.DirectorySeparatorChar}log .txt", rollingInterval: RollingInterval.Day, shared: true)
                 .CreateLogger();
 
-            var telegramUI = new TelegramUI(config);
+            var telegramUI = new TelegramHandler(config);
             telegramUI.StartBot();
 
             var input = string.Empty;

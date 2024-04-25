@@ -4,14 +4,14 @@ using TelegramBot.Models;
 
 namespace TelegramBot
 {
-    public class MessageProcess
+    public class BreaksHandler
     {
         private readonly IConfiguration _config;
         private readonly string _chatId;
-        private List<UserMessageLine> MessageLines { get; set; } = new();
-        private List<UserMessageLine> InputedMessageLines { get; set; }
+        private List<UserMessageLine> MessageLines { get; set; } = [];
+        private List<UserMessageLine> InputedMessageLines { get; set; } = [];
         public bool IsErrorDetected { get; private set; }
-        public string ErrorMessage { get; private set; }
+        public string ErrorMessage { get; private set; } = string.Empty;
         private string EndOfErrorMessage { get; } = $"Измените этот конкретный перерыв и отправьте его заново.{Environment.NewLine}{Environment.NewLine}";
         private int DinnersLimitDay { get; set; }
         private int DinnersLimitNight { get; set; }
@@ -19,12 +19,13 @@ namespace TelegramBot
         private int BreaksLimitDay { get; set; }
         private int BreaksLimitNight { get; set; }
         private int BreaksLimitBetween { get; set; }
-        public MessageProcess(string chatId, IConfiguration config)
+        public BreaksHandler(string chatId, IConfiguration config)
         {
             _chatId = chatId;
             _config = config;
             ApplyLimits();
         }
+
         public void ApplyLimits()
         {
             DinnersLimitDay = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitDay");
@@ -34,48 +35,59 @@ namespace TelegramBot
             BreaksLimitNight = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitNight");
             BreaksLimitBetween = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitBetween");
         }
+
         public void StartProcessing(string messageText, bool isToDelete = false, bool isToInsert = false)
         {
+            InputedMessageLines = [];
             ErrorMessage = String.Empty;
             IsErrorDetected = false;
-            InputedMessageLines = new();
+
             if (isToDelete)
             {
-                ProcessInputData(messageText, true);
+                ProcessInputData(messageText, isToDelete, isToInsert);
                 DeleteLines();
                 return;
             }
-            else if (isToInsert)
-            {
-                ProcessInputData(messageText, true);
-            }
             else
             {
-                ProcessInputData(messageText, false);
+                ProcessInputData(messageText, isToDelete, isToInsert);
             }
+
             if (InputedMessageLines.Count != 0)
+            {
                 ChecksAndInsertLines();
+            }
         }
-        private void ProcessInputData(string messageText, bool isHasKeyword)
+
+        private void ProcessInputData(string messageText, bool isToDelete, bool isToInsert)
         {
-            if (isHasKeyword)
+            if (isToDelete)
             {
                 messageText = messageText.Replace("delete", string.Empty, StringComparison.CurrentCultureIgnoreCase);
-                messageText = messageText.Replace("insert", string.Empty, StringComparison.CurrentCultureIgnoreCase);
                 messageText = messageText.Replace("удалить", string.Empty, StringComparison.CurrentCultureIgnoreCase);
+            }
+            if (isToInsert)
+            {
+                messageText = messageText.Replace("insert", string.Empty, StringComparison.CurrentCultureIgnoreCase);
                 messageText = messageText.Replace("вставить", string.Empty, StringComparison.CurrentCultureIgnoreCase);
             }
+
             var lines = messageText.Trim().Split($"\n").ToList();
-            if (lines.Count > 7 && !isHasKeyword)
+            if (lines.Count > 7 && !isToInsert)
             {
                 IsErrorDetected = true;
                 ErrorMessage = "Неправильный ввод данных. Список перерывов никак не изменён! Слишком много перерывов, добавляйте лишь свои! ";
                 return;
             }
+            TransformIntoMessageLines(lines);
+        }
+
+        private void TransformIntoMessageLines(List<string> lines)
+        {
             foreach (var line in lines.ToList())
             {
                 if (string.IsNullOrWhiteSpace(line)) { continue; }
-                DateTime date = new DateTime();
+                DateTime date = new();
                 int time = 0;
                 string name;
                 var splittedLine = line.Trim().Split(' ');
@@ -109,9 +121,11 @@ namespace TelegramBot
                     lines.Remove(line);
                     continue;
                 }
+
                 InputedMessageLines.Add(new UserMessageLine(date, name, time));
             }
         }
+
         private void ChecksAndInsertLines()
         {
             DeleteOldDates();
@@ -120,7 +134,9 @@ namespace TelegramBot
                 var date = lineToInsert.DinnerDate;
                 var time = lineToInsert.Minutes;
                 if (!CheckForRightDinnerTime(date, time))
+                {
                     continue;
+                }
                 if (MessageLines.Count == 0)
                 {
                     MessageLines.Add(lineToInsert);
@@ -130,7 +146,9 @@ namespace TelegramBot
                 foreach (var line in MessageLines)
                 {
                     if (line.DinnerDate == date && line.Minutes == time)
+                    {
                         counter++;
+                    }
                     if (CheckForDublicate(lineToInsert.ToString(), line.ToString(), date) && CheckForFreeSlots(date, time, counter))
                     {
                         if (MessageLines.First().DinnerDate > date)
@@ -255,14 +273,14 @@ namespace TelegramBot
             }
         }
         public void ClearList() => MessageLines.Clear();
-        private string ConvertToName(string name)
+        private static string ConvertToName(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) { throw new Exception("Имя/Фамилия пусты."); }
             if (name.Length > 50) { throw new Exception("Слишком длинные имя/фамилия."); }
             if (name.Any(char.IsDigit)) { throw new Exception("Имя/Фамилия содержат цифры."); }
             return name;
         }
-        private DateTime ConvertToDate(string time)
+        private static DateTime ConvertToDate(string time)
         {
             if (DateTime.TryParseExact(time, "H:m", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime date))
             {
