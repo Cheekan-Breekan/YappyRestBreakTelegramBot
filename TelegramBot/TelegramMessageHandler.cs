@@ -8,7 +8,6 @@ using Telegram.Bot.Types.ReplyMarkups;
 namespace TelegramBot;
 public class TelegramMessageHandler(IConfiguration config, ITelegramBotClient bot, Update update, Dictionary<long, BreaksHandler> chats, CancellationToken cToken)
 {
-    private static bool isAdmin = false;
     public async Task StartMessageHandleAsync()
     {
         if (update.Type == UpdateType.Message && update?.Message?.Text != null)
@@ -20,6 +19,8 @@ public class TelegramMessageHandler(IConfiguration config, ITelegramBotClient bo
             var id = message.MessageId;
             var author = message.From.Id.ToString();
             var authorName = message.From.Username;
+            var isAdmin = false;
+            
 
             Log.Information($"В чате: {chat.Username} ({chatId}) от {authorName} ({author}) сообщение: {text}");
             if (!CheckForWhitelistChat(chatId))
@@ -40,7 +41,7 @@ public class TelegramMessageHandler(IConfiguration config, ITelegramBotClient bo
                 isAdmin = true;
             }
 
-            await CheckMessageForKeywords(bot, chatId, chat, text, id, breaksHandler, cToken);
+            await CheckMessageForKeywords(bot, chatId, chat, text, id, breaksHandler, isAdmin, cToken);
         }
         else if (update.Type == UpdateType.Message && update?.Message?.Document is not null)
         {
@@ -84,7 +85,7 @@ public class TelegramMessageHandler(IConfiguration config, ITelegramBotClient bo
         return true;
     }
 
-    private async Task CheckMessageForKeywords(ITelegramBotClient bot, long chatId, Chat chat, string text, int id, BreaksHandler handler, CancellationToken cToken)
+    private async Task CheckMessageForKeywords(ITelegramBotClient bot, long chatId, Chat chat, string text, int id, BreaksHandler handler, bool isAdmin, CancellationToken cToken)
     {
         switch (text.ToLower())
         {

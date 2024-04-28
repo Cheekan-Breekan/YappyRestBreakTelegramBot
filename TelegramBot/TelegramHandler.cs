@@ -34,8 +34,8 @@ public class TelegramHandler
     }
     public void StartBot()
     {
-        var id = _config["telegramIdTest"];
-        var telegramBot = new TelegramBotClient(id);
+        var token = _config["telegramId"];
+        var telegramBot = new TelegramBotClient(token);
 
         var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
