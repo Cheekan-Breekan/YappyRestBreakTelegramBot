@@ -215,11 +215,15 @@ public class TelegramMessageHandler(IConfiguration config, ITelegramBotClient bo
     private string PrepareRulesMessage(long chatId)
     {
         return $"Количество перерывов в один промежуток времени для данного чата:{Environment.NewLine}" +
-                            $"Днем с 12 до 16 - {config.GetValue<int>($"Limits:{chatId}:DinnersLimitDay")} обедов и " +
-                            $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitDay")} десятиминуток, " +
-                            $"в остальное дневное время {config.GetValue<int>($"Limits:{chatId}:DinnersLimitBetween")} обедов и " +
+                            $"Утром с 6 до 10 - {config.GetValue<int>($"Limits:{chatId}:DinnersLimitMorning")} обедов и " +
+                            $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitMorning")} десятиминуток,{Environment.NewLine}" +
+                            $"Днем с 10 до 18 - {config.GetValue<int>($"Limits:{chatId}:DinnersLimitDay")} обедов и " +
+                            $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitDay")} десятиминуток,{Environment.NewLine}" +
+                            $"С 18 до 21 - {config.GetValue<int>($"Limits:{chatId}:DinnersLimitBetween")} обедов и " +
                             $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitBetween")} десятиминуток.{Environment.NewLine}" +
-                            $"Ночью - только {config.GetValue<int>($"Limits:{chatId}:DinnersLimitNight")} обедов и " +
+                            $"Вечером с 21 до полуночи - {config.GetValue<int>($"Limits:{chatId}:DinnersLimitEvening")} обедов и " +
+                            $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitEvening")} десятиминуток.{Environment.NewLine}" +
+                            $"Ночью c 0 до 6 - {config.GetValue<int>($"Limits:{chatId}:DinnersLimitNight")} обедов и " +
                             $"{config.GetValue<int>($"Limits:{chatId}:BreaksLimitNight")} десятиминуток.";
     }
     private static string PrepareGuideMessage()

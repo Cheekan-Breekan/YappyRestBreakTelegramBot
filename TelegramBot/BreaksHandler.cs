@@ -13,12 +13,16 @@ namespace TelegramBot
         public bool IsErrorDetected { get; private set; }
         public string ErrorMessage { get; private set; } = string.Empty;
         private string EndOfErrorMessage { get; } = $"Измените этот конкретный перерыв и отправьте его заново.{Environment.NewLine}{Environment.NewLine}";
-        private int DinnersLimitDay { get; set; }
         private int DinnersLimitNight { get; set; }
+        private int DinnersLimitMorning { get; set; }
+        private int DinnersLimitDay { get; set; }
         private int DinnersLimitBetween { get; set; }
-        private int BreaksLimitDay { get; set; }
+        private int DinnersLimitEvening { get; set; }
         private int BreaksLimitNight { get; set; }
+        private int BreaksLimitMorning { get; set; }
+        private int BreaksLimitDay { get; set; }
         private int BreaksLimitBetween { get; set; }
+        private int BreaksLimitEvening { get; set; }
         public BreaksHandler(string chatId, IConfiguration config)
         {
             _chatId = chatId;
@@ -28,12 +32,16 @@ namespace TelegramBot
 
         public void ApplyLimits()
         {
-            DinnersLimitDay = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitDay");
             DinnersLimitNight = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitNight");
+            DinnersLimitEvening = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitEvening");
+            DinnersLimitDay = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitDay");
             DinnersLimitBetween = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitBetween");
-            BreaksLimitDay = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitDay");
+            DinnersLimitNight = _config.GetValue<int>($"Limits:{_chatId}:DinnersLimitNight");
             BreaksLimitNight = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitNight");
+            BreaksLimitMorning = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitMorning");
+            BreaksLimitDay = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitDay");
             BreaksLimitBetween = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitBetween");
+            BreaksLimitEvening = _config.GetValue<int>($"Limits:{_chatId}:BreaksLimitEvening");
         }
 
         public void StartProcessing(string messageText, bool isToDelete = false, bool isToInsert = false)
@@ -199,8 +207,14 @@ namespace TelegramBot
         }
         private bool CheckForFreeSlots(DateTime date, int time, int counter)
         {
-            var dinnerLimit = (date.Hour >= 22 || date.Hour < 6) ? DinnersLimitNight : (date.Hour >= 12 && date.Hour <= 16) ? DinnersLimitDay : DinnersLimitBetween;
-            var breakLimit = (date.Hour >= 22 || date.Hour < 6) ? BreaksLimitNight : (date.Hour >= 12 && date.Hour <= 16) ? BreaksLimitDay : BreaksLimitBetween;
+            var dinnerLimit = (date.Hour >= 0 && date.Hour < 6) ? DinnersLimitNight :
+                (date.Hour >= 6 && date.Hour < 10) ? DinnersLimitMorning :
+                (date.Hour >= 10 && date.Hour < 18) ? DinnersLimitDay :
+                (date.Hour >= 18 && date.Hour < 21) ? DinnersLimitBetween : DinnersLimitEvening;
+            var breakLimit = (date.Hour >= 0 && date.Hour < 6) ? BreaksLimitNight :
+                (date.Hour >= 6 && date.Hour < 10) ? BreaksLimitMorning :
+                (date.Hour >= 10 && date.Hour < 18) ? BreaksLimitDay :
+                (date.Hour >= 18 && date.Hour < 21) ? BreaksLimitBetween : BreaksLimitEvening;
             var isTenMinutes = time == 10;
 
             if (isTenMinutes && counter >= breakLimit)
